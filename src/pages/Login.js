@@ -1,4 +1,13 @@
+import { useNavigate } from "react-router-dom";
+
 export default function Login() {
+  const navigate = useNavigate();
+
+  const _handleSignin = (e) => {
+    e.preventDefault(); // stop page refresh
+
+    navigate("/home");
+  };
   return (
     <div className="h-screen bg-[#eee] flex flex-col items-center justify-start overflow-hidden">
       {/* White Container  */}
@@ -38,10 +47,11 @@ export default function Login() {
                   Warn me before logging me into other sites.
                 </label>
               </div>
-              {/* Sign In Button */}
+              {/* Sign In Button (original color is #006DCC) */}
               <button
                 type="submit"
-                className="bg-[#006DCC] text-white py-2 rounded-md hover:bg-[#1a0d5c]"
+                className="bg-[#210F7A] text-white py-2 rounded-md hover:bg-[#1a0d5c]"
+                onClick={_handleSignin}
               >
                 Sign In
               </button>
@@ -49,6 +59,7 @@ export default function Login() {
               <button
                 type="button"
                 className="mt-2 text-xs text-blue-600 hover:underline self-start"
+                onClic
               >
                 Change Password?
               </button>
