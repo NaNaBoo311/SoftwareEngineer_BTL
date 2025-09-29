@@ -1,4 +1,5 @@
 import { BrowserRouter as Router, Routes, Route, Link } from "react-router-dom";
+import Layout from "./Layout";
 import Login from "./pages/Login";
 import HomePage from "./pages/HomePage";
 export default function App() {
@@ -7,7 +8,14 @@ export default function App() {
       {/* Routes */}
       <Routes>
         <Route path="/" element={<Login />} />
-        <Route path="/home" element={<HomePage />} />
+        <Route
+          path="/home"
+          element={
+            <Layout>
+              <HomePage />
+            </Layout>
+          }
+        />
       </Routes>
     </Router>
   );
