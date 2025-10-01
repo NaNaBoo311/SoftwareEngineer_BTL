@@ -1,11 +1,11 @@
-import { BrowserRouter as Router, Routes, Route, Link } from "react-router-dom";
+import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import Layout from "./Layout";
 import Login from "./pages/Login";
 import HomePage from "./pages/HomePage";
+import FloatingMenu from "./components/FloatingMenu";
 export default function App() {
   return (
     <Router>
-      {/* Routes */}
       <Routes>
         <Route path="/" element={<Login />} />
         <Route
@@ -17,6 +17,9 @@ export default function App() {
           }
         />
       </Routes>
+
+      {/* Floating Menu (always visible) */}
+      <FloatingMenu />
     </Router>
   );
 }
