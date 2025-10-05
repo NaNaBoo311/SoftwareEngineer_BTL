@@ -4,6 +4,7 @@ import Login from "./pages/Login";
 import HomePage from "./pages/HomePage";
 import ProfilePage from "./pages/ProfilePage";
 import FloatingMenu from "./components/FloatingMenu";
+import ApiPlayground from "./pages/ApiPlayGround";
 export default function App() {
   return (
     <Router>
@@ -22,6 +23,14 @@ export default function App() {
           element={
             <Layout>
               <ProfilePage />
+            </Layout>
+          }
+        />
+        <Route
+          path="/api"
+          element={
+            <Layout>
+              <ApiPlayground />
             </Layout>
           }
         />

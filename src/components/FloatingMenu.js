@@ -41,6 +41,13 @@ export default function FloatingMenu() {
               >
                 Profile
               </Link>
+              <Link
+                to="/api"
+                className="block px-4 py-2 text-center rounded-lg border hover:bg-gray-100"
+                onClick={() => setOpen(false)}
+              >
+                API Playground
+              </Link>
             </div>
 
             <button
