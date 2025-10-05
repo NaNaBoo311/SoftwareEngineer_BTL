@@ -66,12 +66,15 @@ export default function Navbar() {
               >
                 Settings
               </Link>
-              <button
+              {/* <button
                 onClick={() => console.log("Exit clicked")}
                 className="w-full text-left px-4 py-2 hover:bg-gray-100"
               >
                 Exit
-              </button>
+              </button> */}
+              <Link to="/" className="block px-4 py-2 hover:bg-gray-100">
+                Exit
+              </Link>
             </div>
           )}
         </div>
