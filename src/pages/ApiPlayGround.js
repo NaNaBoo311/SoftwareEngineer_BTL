@@ -21,21 +21,31 @@ export default function ApiPlayground() {
       },
       {
         name: "getAllStudent",
-        description: "Get all student available in the system",
+        description: "Get all students available in the system",
         params: [],
         handler: async () => await studentService.getAllStudent(),
       },
       {
         name: "insertStudent",
-        description: "Insert a new student record and return user_id",
-        params: ["fullName", "email", "studentCode", "program", "major"],
+        description: "1/ Register student account.\n2/ Insert student profile.",
+        params: [
+          "fullName",
+          "email",
+          "password",
+          "studentCode",
+          "program",
+          "major",
+          "faculty",
+        ],
         handler: async (params) =>
           await studentService.insertStudent(
             params.fullName,
             params.email,
+            params.password,
             params.studentCode,
             params.program,
-            params.major
+            params.major,
+            params.faculty
           ),
       },
     ],
@@ -65,7 +75,7 @@ export default function ApiPlayground() {
       const data = await api.handler(paramValues);
       setResult(data);
     } catch (err) {
-      setError(err.message);
+      setError(err.message || String(err));
     } finally {
       setLoading(false);
     }
@@ -136,7 +146,10 @@ export default function ApiPlayground() {
               <h2 className="text-xl font-semibold text-gray-700 mb-2">
                 {selectedApi}
               </h2>
-              <p className="text-sm text-gray-500 mb-4">
+              <p
+                className="text-sm text-gray-500 mb-4"
+                style={{ whiteSpace: "pre-line" }}
+              >
                 {
                   apiGroups[selectedCategory].find(
                     (a) => a.name === selectedApi

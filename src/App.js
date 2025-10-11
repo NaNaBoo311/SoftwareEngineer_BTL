@@ -5,27 +5,35 @@ import HomePage from "./pages/HomePage";
 import ProfilePage from "./pages/ProfilePage";
 import FloatingMenu from "./components/FloatingMenu";
 import ApiPlayground from "./pages/ApiPlayGround";
+import ProtectedRoute from "./components/ProtectedRoute";
 export default function App() {
   return (
     <Router>
       <Routes>
         <Route path="/" element={<Login />} />
+
         <Route
           path="/home"
           element={
-            <Layout>
-              <HomePage />
-            </Layout>
+            <ProtectedRoute>
+              <Layout>
+                <HomePage />
+              </Layout>
+            </ProtectedRoute>
           }
         />
+
         <Route
           path="/profile"
           element={
-            <Layout>
-              <ProfilePage />
-            </Layout>
+            <ProtectedRoute>
+              <Layout>
+                <ProfilePage />
+              </Layout>
+            </ProtectedRoute>
           }
         />
+
         <Route
           path="/api"
           element={
@@ -36,7 +44,7 @@ export default function App() {
         />
       </Routes>
 
-      {/* Floating Menu (always visible) */}
+      {/* Always visible */}
       <FloatingMenu />
     </Router>
   );

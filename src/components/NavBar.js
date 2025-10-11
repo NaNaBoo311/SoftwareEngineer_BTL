@@ -1,10 +1,19 @@
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Bell, MessageSquare } from "lucide-react"; // icons
 import { useState } from "react";
+import { authService } from "../services/authService";
 
 export default function Navbar() {
+  const navigate = useNavigate();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
-
+  const handleExit = async () => {
+    try {
+      await authService.signOut(); //
+      navigate("/");
+    } catch (error) {
+      alert("Login failed: " + error.message);
+    }
+  };
   return (
     <nav className="bg-[#0388B4] text-white px-6 py-2 flex justify-between items-center shadow-md">
       {/* Left: Logo */}
@@ -66,15 +75,12 @@ export default function Navbar() {
               >
                 Settings
               </Link>
-              {/* <button
-                onClick={() => console.log("Exit clicked")}
+              <button
+                onClick={handleExit}
                 className="w-full text-left px-4 py-2 hover:bg-gray-100"
               >
                 Exit
-              </button> */}
-              <Link to="/" className="block px-4 py-2 hover:bg-gray-100">
-                Exit
-              </Link>
+              </button>
             </div>
           )}
         </div>
