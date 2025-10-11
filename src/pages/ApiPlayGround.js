@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { studentService } from "../services/studentService";
-
+import { authService } from "../services/authService";
 export default function ApiPlayground() {
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [selectedApi, setSelectedApi] = useState(null);
@@ -58,6 +58,30 @@ export default function ApiPlayground() {
           // Example placeholder
           return { message: `Tutor code received: ${params.tutorCode}` };
         },
+      },
+    ],
+    Authentication: [
+      {
+        name: "signIn",
+        description: "Login to a tutor/student account",
+        params: ["username", "password"],
+        handler: async (params) =>
+          await authService.signIn(
+            `${params.username}@hcmut.edu.vn`,
+            params.password
+          ),
+      },
+      {
+        name: "signOut",
+        description: "Logout from a tutor/student account",
+        params: [],
+        handler: async () => await authService.signOut(),
+      },
+      {
+        name: "getUser",
+        description: "Get the current login user",
+        params: [],
+        handler: async () => await authService.getUser(),
       },
     ],
   };
