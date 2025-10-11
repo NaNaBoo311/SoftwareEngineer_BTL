@@ -30,8 +30,8 @@ export default function Navbar() {
         <Link to="/classes" className="hover:text-gray-300">
           Classes
         </Link>
-        <Link to="/schedule" className="hover:text-gray-300">
-          Schedule
+        <Link to="/register" className="hover:text-gray-300">
+          Register
         </Link>
         <Link to="/support" className="hover:text-gray-300">
           Support

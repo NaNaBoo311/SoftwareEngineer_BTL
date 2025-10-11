@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { studentService } from "../services/studentService";
 import { tutorService } from "../services/tutorService";
 import { authService } from "../services/authService";
+import { programService } from "../services/programService";
 export default function ApiPlayground() {
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [selectedApi, setSelectedApi] = useState(null);
@@ -13,19 +14,6 @@ export default function ApiPlayground() {
   //  Grouped API definitions
   const apiGroups = {
     Student: [
-      {
-        name: "getStudentInfoByCode",
-        description: "Fetch a student record by student code",
-        params: ["studentCode"],
-        handler: async (params) =>
-          await studentService.getStudentInfoByCode(params.studentCode),
-      },
-      {
-        name: "getAllStudent",
-        description: "Get all students available in the system",
-        params: [],
-        handler: async () => await studentService.getAllStudent(),
-      },
       {
         name: "insertStudent",
         description: "1/ Register student account.\n2/ Insert student profile.",
@@ -49,23 +37,21 @@ export default function ApiPlayground() {
             params.faculty
           ),
       },
+      {
+        name: "getStudentInfoByCode",
+        description: "Fetch a student record by student code",
+        params: ["studentCode"],
+        handler: async (params) =>
+          await studentService.getStudentInfoByCode(params.studentCode),
+      },
+      {
+        name: "getAllStudent",
+        description: "Get all students available in the system",
+        params: [],
+        handler: async () => await studentService.getAllStudent(),
+      },
     ],
     Tutor: [
-      {
-        name: "getTutorInfoByCode",
-        description: "Fetch a tutor record by tutor code",
-        params: ["tutorCode"],
-        handler: async (params) =>
-          tutorService.getTutorInfoByCode(params.tutorCode),
-      },
-
-      {
-        name: "getAllTutor",
-        description: "Get all the tutor in the database",
-        params: [],
-        handler: async () => tutorService.getAllTutor(),
-      },
-
       {
         name: "insertTutor",
         description:
@@ -89,6 +75,20 @@ export default function ApiPlayground() {
             params.faculty,
             params.title
           ),
+      },
+      {
+        name: "getTutorInfoByCode",
+        description: "Fetch a tutor record by tutor code",
+        params: ["tutorCode"],
+        handler: async (params) =>
+          tutorService.getTutorInfoByCode(params.tutorCode),
+      },
+
+      {
+        name: "getAllTutor",
+        description: "Get all the tutor in the database",
+        params: [],
+        handler: async () => tutorService.getAllTutor(),
       },
     ],
     Authentication: [
@@ -121,6 +121,39 @@ export default function ApiPlayground() {
         params: ["userId"],
         handler: async (params) =>
           await authService.deleteUserAccount(params.userId),
+      },
+    ],
+    Program: [
+      {
+        name: "insertProgram",
+        description: "Insert a program to the system.",
+        params: ["name", "code", "description", "faculty", "maxStudent"],
+        handler: async (params) =>
+          await programService.insertProgram(
+            params.name,
+            params.code,
+            (params.description = null),
+            params.faculty,
+            (params.maxStudents = 30)
+          ),
+      },
+      {
+        name: "getAllProgram",
+        description: "Get all the program in the database",
+        params: [],
+        handler: async () => programService.getAllPrograms(),
+      },
+      {
+        name: "getProgramByCode",
+        description: "Get the program by its code.",
+        params: ["code"],
+        handler: async (params) => programService.getProgramByCode(params.code),
+      },
+      {
+        name: "deleteProgram",
+        description: "Delete the program by its code.",
+        params: ["code"],
+        handler: async (params) => programService.deleteProgram(params.code),
       },
     ],
   };

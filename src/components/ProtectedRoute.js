@@ -23,9 +23,8 @@ export default function ProtectedRoute({ children }) {
 
   if (loading)
     return (
-      <div className="flex flex-col items-center justify-center h-screen bg-gradient-to-br from-blue-500 to-indigo-700 text-white">
-        <div className="w-16 h-16 border-4 border-white/30 border-t-white rounded-full animate-spin"></div>
-        <p className="mt-6 text-lg font-medium">Checking session...</p>
+      <div className="flex items-center justify-center h-screen bg-white">
+        <div className="w-12 h-12 border-4 border-gray-200 border-t-gray-600 rounded-full animate-spin"></div>
       </div>
     );
 

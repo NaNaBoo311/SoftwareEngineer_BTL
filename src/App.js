@@ -3,6 +3,7 @@ import Layout from "./Layout";
 import Login from "./pages/Login";
 import HomePage from "./pages/HomePage";
 import ProfilePage from "./pages/ProfilePage";
+import Register from "./pages/Register";
 import FloatingMenu from "./components/FloatingMenu";
 import ApiPlayground from "./pages/ApiPlayGround";
 import ProtectedRoute from "./components/ProtectedRoute";
@@ -29,6 +30,17 @@ export default function App() {
             <ProtectedRoute>
               <Layout>
                 <ProfilePage />
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/register"
+          element={
+            <ProtectedRoute>
+              <Layout>
+                <Register />
               </Layout>
             </ProtectedRoute>
           }
