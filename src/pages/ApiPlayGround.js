@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { studentService } from "../services/studentService";
+import { tutorService } from "../services/tutorService";
 import { authService } from "../services/authService";
 export default function ApiPlayground() {
   const [selectedCategory, setSelectedCategory] = useState(null);
@@ -54,10 +55,40 @@ export default function ApiPlayground() {
         name: "getTutorInfoByCode",
         description: "Fetch a tutor record by tutor code",
         params: ["tutorCode"],
-        handler: async (params) => {
-          // Example placeholder
-          return { message: `Tutor code received: ${params.tutorCode}` };
-        },
+        handler: async (params) =>
+          tutorService.getTutorInfoByCode(params.tutorCode),
+      },
+
+      {
+        name: "getAllTutor",
+        description: "Get all the tutor in the database",
+        params: [],
+        handler: async () => tutorService.getAllTutor(),
+      },
+
+      {
+        name: "insertTutor",
+        description:
+          "1/ Register the tutor account. \n2/ Fill in the profile.\n3/ Return tutor id.",
+        params: [
+          "fullName",
+          "email",
+          "password",
+          "tutorCode",
+          "program",
+          "faculty",
+          "title",
+        ],
+        handler: async (params) =>
+          tutorService.insertTutor(
+            params.fullName,
+            params.email,
+            params.password,
+            params.tutorCode,
+            params.program,
+            params.faculty,
+            params.title
+          ),
       },
     ],
     Authentication: [
@@ -78,7 +109,7 @@ export default function ApiPlayground() {
         handler: async () => await authService.signOut(),
       },
       {
-        name: "getUser",
+        name: "getCurrentUser",
         description: "Get the current login user",
         params: [],
         handler: async () => await authService.getUser(),
@@ -116,11 +147,17 @@ export default function ApiPlayground() {
         {Object.entries(apiGroups).map(([category, apis]) => (
           <div key={category}>
             <button
-              onClick={() =>
-                setSelectedCategory(
-                  selectedCategory === category ? null : category
-                )
-              }
+              onClick={() => {
+                const newCategory =
+                  selectedCategory === category ? null : category;
+                setSelectedCategory(newCategory);
+                if (newCategory === null) {
+                  setSelectedApi(null);
+                  setParamValues({});
+                  setResult(null);
+                  setError(null);
+                }
+              }}
               className={`w-full text-left font-semibold text-lg px-3 py-2 rounded-md transition ${
                 selectedCategory === category
                   ? "bg-blue-800"
