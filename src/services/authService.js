@@ -33,6 +33,15 @@ class AuthService {
     if (error) throw error;
     return data?.[0]; // RPC returns an array
   }
+
+  async deleteUserAccount(userId) {
+    const { data, error } = await supabase.rpc("delete_user_account", {
+      p_user_id: userId,
+    });
+
+    if (error) throw error;
+    return data;
+  }
 }
 
 export const authService = new AuthService();

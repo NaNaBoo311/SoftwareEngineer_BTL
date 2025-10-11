@@ -114,6 +114,14 @@ export default function ApiPlayground() {
         params: [],
         handler: async () => await authService.getUser(),
       },
+      {
+        name: "deleteUserAccount",
+        description:
+          "Delete the user account as well as tutor/student information.",
+        params: ["userId"],
+        handler: async (params) =>
+          await authService.deleteUserAccount(params.userId),
+      },
     ],
   };
 
