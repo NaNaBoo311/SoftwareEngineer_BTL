@@ -1,21 +1,19 @@
 import { Link, useNavigate } from "react-router-dom";
-import { Bell, MessageSquare } from "lucide-react";
+import { Bell, MessageSquare } from "lucide-react"; // icons
 import { useState } from "react";
+import { authService } from "../services/authService";
 
 export default function Navbar() {
-  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const navigate = useNavigate();
-
-  function goToProfile() {
-    const role = localStorage.getItem("userRole") || "Student";
-    const userId = localStorage.getItem("userId");
-    const params = new URLSearchParams();
-    params.set("role", role.toLowerCase());
-    if (userId) params.set("id", userId);
-    navigate(`/profile?${params.toString()}`);
-    setIsDropdownOpen(false);
-  }
-
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const handleExit = async () => {
+    try {
+      await authService.signOut(); //
+      navigate("/");
+    } catch (error) {
+      alert("Login failed: " + error.message);
+    }
+  };
   return (
     <nav className="bg-[#0388B4] text-white px-6 py-2 flex justify-between items-center shadow-md">
       {/* Left: Logo */}
@@ -32,8 +30,8 @@ export default function Navbar() {
         <Link to="/classes" className="hover:text-gray-300">
           Classes
         </Link>
-        <Link to="/schedule" className="hover:text-gray-300">
-          Schedule
+        <Link to="/register" className="hover:text-gray-300">
+          Register
         </Link>
         <Link to="/support" className="hover:text-gray-300">
           Support
@@ -65,9 +63,9 @@ export default function Navbar() {
           {/* Drop Down Menu When Avatar is Clicked  */}
           {isDropdownOpen && (
             <div className="absolute right-0 mt-2 w-40 bg-white text-black rounded-md shadow-lg py-2 z-50">
-              <button onClick={goToProfile} className="w-full text-left px-4 py-2 hover:bg-gray-100">
+              <Link to="/profile" className="block px-4 py-2 hover:bg-gray-100">
                 Profile
-              </button>
+              </Link>
               <Link to="/grades" className="block px-4 py-2 hover:bg-gray-100">
                 Grades
               </Link>
@@ -77,15 +75,12 @@ export default function Navbar() {
               >
                 Settings
               </Link>
-              {/* <button
-                onClick={() => console.log("Exit clicked")}
+              <button
+                onClick={handleExit}
                 className="w-full text-left px-4 py-2 hover:bg-gray-100"
               >
                 Exit
-              </button> */}
-              <Link to="/" className="block px-4 py-2 hover:bg-gray-100">
-                Exit
-              </Link>
+              </button>
             </div>
           )}
         </div>

@@ -1,12 +1,22 @@
 import { useNavigate } from "react-router-dom";
+import { authService } from "../services/authService";
+import { useState } from "react";
 
 export default function Login() {
   const navigate = useNavigate();
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
 
-  const _handleSignin = (e) => {
+  const _handleSignin = async (e) => {
     e.preventDefault(); // stop page refresh
+    const fullEmail = `${email}@hcmut.edu.vn`;
 
-    navigate("/home");
+    try {
+      const data = await authService.signIn(fullEmail, password);
+      navigate("/home");
+    } catch (error) {
+      alert("Login failed: " + error.message);
+    }
   };
   return (
     <div className="h-screen bg-[#eee] flex flex-col items-center justify-start overflow-hidden">
@@ -28,17 +38,19 @@ export default function Login() {
               Enter your Username and Password
             </h2>
             <form className="flex flex-col space-y-4">
-              {/* Username Input  */}
+              {/* Username  */}
               <input
                 type="text"
                 placeholder="Username"
                 className="p-2 border rounded-md bg-[rgb(232,240,254)] placeholder-shown:bg-[rgb(232,240,254)] not-placeholder-shown:bg-[#FFFFDD]"
+                onChange={(e) => setEmail(e.target.value)}
               />
               {/* Password Input */}
               <input
                 type="password"
                 placeholder="Password"
                 className="p-2 border rounded-md bg-[rgb(232,240,254)] placeholder-shown:bg-[rgb(232,240,254)] not-placeholder-shown:bg-[#FFFFDD]"
+                onChange={(e) => setPassword(e.target.value)}
               />
               {/* Checkbox */}
               <div className="flex items-center">

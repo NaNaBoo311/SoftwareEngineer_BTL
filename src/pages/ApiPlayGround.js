@@ -1,6 +1,8 @@
 import React, { useState } from "react";
 import { studentService } from "../services/studentService";
-
+import { tutorService } from "../services/tutorService";
+import { authService } from "../services/authService";
+import { programService } from "../services/programService";
 export default function ApiPlayground() {
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [selectedApi, setSelectedApi] = useState(null);
@@ -13,6 +15,29 @@ export default function ApiPlayground() {
   const apiGroups = {
     Student: [
       {
+        name: "insertStudent",
+        description: "1/ Register student account.\n2/ Insert student profile.",
+        params: [
+          "fullName",
+          "email",
+          "password",
+          "studentCode",
+          "program",
+          "major",
+          "faculty",
+        ],
+        handler: async (params) =>
+          await studentService.insertStudent(
+            params.fullName,
+            params.email,
+            params.password,
+            params.studentCode,
+            params.program,
+            params.major,
+            params.faculty
+          ),
+      },
+      {
         name: "getStudentInfoByCode",
         description: "Fetch a student record by student code",
         params: ["studentCode"],
@@ -21,33 +46,114 @@ export default function ApiPlayground() {
       },
       {
         name: "getAllStudent",
-        description: "Get all student available in the system",
+        description: "Get all students available in the system",
         params: [],
         handler: async () => await studentService.getAllStudent(),
-      },
-      {
-        name: "insertStudent",
-        description: "Insert a new student record and return user_id",
-        params: ["fullName", "email", "studentCode", "program", "major"],
-        handler: async (params) =>
-          await studentService.insertStudent(
-            params.fullName,
-            params.email,
-            params.studentCode,
-            params.program,
-            params.major
-          ),
       },
     ],
     Tutor: [
       {
+        name: "insertTutor",
+        description:
+          "1/ Register the tutor account. \n2/ Fill in the profile.\n3/ Return tutor id.",
+        params: [
+          "fullName",
+          "email",
+          "password",
+          "tutorCode",
+          "program",
+          "faculty",
+          "title",
+        ],
+        handler: async (params) =>
+          tutorService.insertTutor(
+            params.fullName,
+            params.email,
+            params.password,
+            params.tutorCode,
+            params.program,
+            params.faculty,
+            params.title
+          ),
+      },
+      {
         name: "getTutorInfoByCode",
         description: "Fetch a tutor record by tutor code",
         params: ["tutorCode"],
-        handler: async (params) => {
-          // Example placeholder
-          return { message: `Tutor code received: ${params.tutorCode}` };
-        },
+        handler: async (params) =>
+          tutorService.getTutorInfoByCode(params.tutorCode),
+      },
+
+      {
+        name: "getAllTutor",
+        description: "Get all the tutor in the database",
+        params: [],
+        handler: async () => tutorService.getAllTutor(),
+      },
+    ],
+    Authentication: [
+      {
+        name: "signIn",
+        description: "Login to a tutor/student account",
+        params: ["username", "password"],
+        handler: async (params) =>
+          await authService.signIn(
+            `${params.username}@hcmut.edu.vn`,
+            params.password
+          ),
+      },
+      {
+        name: "signOut",
+        description: "Logout from a tutor/student account",
+        params: [],
+        handler: async () => await authService.signOut(),
+      },
+      {
+        name: "getCurrentUser",
+        description: "Get the current login user",
+        params: [],
+        handler: async () => await authService.getUser(),
+      },
+      {
+        name: "deleteUserAccount",
+        description:
+          "Delete the user account as well as tutor/student information.",
+        params: ["userId"],
+        handler: async (params) =>
+          await authService.deleteUserAccount(params.userId),
+      },
+    ],
+    Program: [
+      {
+        name: "insertProgram",
+        description: "Insert a program to the system.",
+        params: ["name", "code", "description", "faculty", "maxStudent"],
+        handler: async (params) =>
+          await programService.insertProgram(
+            params.name,
+            params.code,
+            (params.description = null),
+            params.faculty,
+            (params.maxStudents = 30)
+          ),
+      },
+      {
+        name: "getAllProgram",
+        description: "Get all the program in the database",
+        params: [],
+        handler: async () => programService.getAllPrograms(),
+      },
+      {
+        name: "getProgramByCode",
+        description: "Get the program by its code.",
+        params: ["code"],
+        handler: async (params) => programService.getProgramByCode(params.code),
+      },
+      {
+        name: "deleteProgram",
+        description: "Delete the program by its code.",
+        params: ["code"],
+        handler: async (params) => programService.deleteProgram(params.code),
       },
     ],
   };
@@ -65,7 +171,7 @@ export default function ApiPlayground() {
       const data = await api.handler(paramValues);
       setResult(data);
     } catch (err) {
-      setError(err.message);
+      setError(err.message || String(err));
     } finally {
       setLoading(false);
     }
@@ -82,11 +188,17 @@ export default function ApiPlayground() {
         {Object.entries(apiGroups).map(([category, apis]) => (
           <div key={category}>
             <button
-              onClick={() =>
-                setSelectedCategory(
-                  selectedCategory === category ? null : category
-                )
-              }
+              onClick={() => {
+                const newCategory =
+                  selectedCategory === category ? null : category;
+                setSelectedCategory(newCategory);
+                if (newCategory === null) {
+                  setSelectedApi(null);
+                  setParamValues({});
+                  setResult(null);
+                  setError(null);
+                }
+              }}
               className={`w-full text-left font-semibold text-lg px-3 py-2 rounded-md transition ${
                 selectedCategory === category
                   ? "bg-blue-800"
@@ -136,7 +248,10 @@ export default function ApiPlayground() {
               <h2 className="text-xl font-semibold text-gray-700 mb-2">
                 {selectedApi}
               </h2>
-              <p className="text-sm text-gray-500 mb-4">
+              <p
+                className="text-sm text-gray-500 mb-4"
+                style={{ whiteSpace: "pre-line" }}
+              >
                 {
                   apiGroups[selectedCategory].find(
                     (a) => a.name === selectedApi
