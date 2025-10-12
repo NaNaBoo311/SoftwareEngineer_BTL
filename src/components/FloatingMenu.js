@@ -1,18 +1,28 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { authService } from "../services/authService";
 
 export default function FloatingMenu() {
   const [open, setOpen] = useState(false);
   const navigate = useNavigate();
 
-  function goToProfile() {
-    const role = localStorage.getItem("userRole") || "Student";
-    const userId = localStorage.getItem("userId");
+  async function goToProfile() {
     const params = new URLSearchParams();
-    params.set("role", role.toLowerCase());
-    if (userId) params.set("id", userId);
-    navigate(`/profile?${params.toString()}`);
-    setOpen(false);
+    try {
+      const profile = await authService.getUser();
+      const roleFromProfile = profile?.role || profile?.role_name || "student";
+      const role = String(roleFromProfile).toLowerCase();
+      const userId = profile?.student_id || profile?.tutor_id || profile?.user_id || profile?.id;
+      params.set("role", role);
+      if (userId) params.set("id", userId);
+      navigate(`/profile?${params.toString()}`);
+    } catch (err) {
+      console.error("Failed to fetch user profile:", err?.message || err);
+      params.set("role", "student");
+      navigate(`/profile?${params.toString()}`);
+    } finally {
+      setOpen(false);
+    }
   }
 
   return (
@@ -51,6 +61,13 @@ export default function FloatingMenu() {
               >
                 Profile
               </button>
+              <Link
+                to="/classes"
+                className="block px-4 py-2 text-center rounded-lg border hover:bg-gray-100"
+                onClick={() => setOpen(false)}
+              >
+                Classes
+              </Link>
               <Link
                 to="/api"
                 className="block px-4 py-2 text-center rounded-lg border hover:bg-gray-100"
