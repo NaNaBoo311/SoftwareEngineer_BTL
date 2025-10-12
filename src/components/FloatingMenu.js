@@ -1,8 +1,19 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 
 export default function FloatingMenu() {
   const [open, setOpen] = useState(false);
+  const navigate = useNavigate();
+
+  function goToProfile() {
+    const role = localStorage.getItem("userRole") || "Student";
+    const userId = localStorage.getItem("userId");
+    const params = new URLSearchParams();
+    params.set("role", role.toLowerCase());
+    if (userId) params.set("id", userId);
+    navigate(`/profile?${params.toString()}`);
+    setOpen(false);
+  }
 
   return (
     <div className="fixed bottom-6 right-6 z-50">
@@ -34,13 +45,12 @@ export default function FloatingMenu() {
               >
                 Home*
               </Link>
-              <Link
-                to="/profile"
-                className="block px-4 py-2 text-center rounded-lg border hover:bg-gray-100"
-                onClick={() => setOpen(false)}
+              <button
+                onClick={goToProfile}
+                className="block w-full text-center px-4 py-2 rounded-lg border hover:bg-gray-100"
               >
                 Profile
-              </Link>
+              </button>
               <Link
                 to="/api"
                 className="block px-4 py-2 text-center rounded-lg border hover:bg-gray-100"
