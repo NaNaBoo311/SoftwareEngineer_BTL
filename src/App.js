@@ -3,8 +3,8 @@ import Layout from "./Layout";
 import Login from "./pages/Login";
 import HomePage from "./pages/HomePage";
 import ProfilePage from "./pages/ProfilePage";
-import ClassesPage from "./pages/ClassesPage";
 import Register from "./pages/Register";
+import CoursePage from "./pages/CoursePage";
 import FloatingMenu from "./components/FloatingMenu";
 import ApiPlayground from "./pages/ApiPlayGround";
 import ProtectedRoute from "./components/ProtectedRoute";
@@ -26,22 +26,22 @@ export default function App() {
         />
 
         <Route
-          path="/classes"
+          path="/profile"
           element={
             <ProtectedRoute>
               <Layout>
-                <ClassesPage />
+                <ProfilePage />
               </Layout>
             </ProtectedRoute>
           }
         />
 
         <Route
-          path="/profile"
+          path="/courses/:id"
           element={
             <ProtectedRoute>
               <Layout>
-                <ProfilePage />
+                <CoursePage />
               </Layout>
             </ProtectedRoute>
           }
