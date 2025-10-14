@@ -83,6 +83,7 @@ export default function HomePage() {
 
               <Link
                 to={`/courses/${course.id}`}
+                state={{ course }}
                 className="inline-block mt-2 text-indigo-600 font-medium hover:underline text-sm"
               >
                 View Details →

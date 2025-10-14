@@ -62,11 +62,11 @@ export default function FloatingMenu() {
                 Profile
               </button>
               <Link
-                to="/classes"
+                to="/courses/:id"
                 className="block px-4 py-2 text-center rounded-lg border hover:bg-gray-100"
                 onClick={() => setOpen(false)}
               >
-                Classes
+                Course
               </Link>
               <Link
                 to="/api"
