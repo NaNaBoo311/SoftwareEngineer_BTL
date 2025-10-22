@@ -150,11 +150,18 @@ export default function ApiPlayground() {
         handler: async (params) => programService.getProgramByCode(params.code),
       },
       {
+        name: "getProgramsForRegistration",
+        description: "Get all the program for registration",
+        params: [],
+        handler: async () => programService.getProgramsForRegistration(),
+      },
+      {
         name: "deleteProgram",
         description: "Delete the program by its code.",
         params: ["code"],
         handler: async (params) => programService.deleteProgram(params.code),
       },
+
     ],
   };
 

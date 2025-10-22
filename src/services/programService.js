@@ -33,7 +33,7 @@ class ProgramService {
     const { data, error } = await supabase
       .from("programs")
       .select("*")
-      .eq("code", code)
+      .eq("program_code", code)
       .single();
     if (error) throw error;
     return data;
@@ -44,6 +44,46 @@ class ProgramService {
     if (error) throw error;
     return { message: "Program deleted successfully" };
   }
+
+  async getProgramsForRegistration() {
+    const { data, error } = await supabase
+      .from("programs")
+      .select(`
+        id,
+        program_code,
+        name,
+        description,
+        category,
+        status,
+        classes (
+          id,
+          class_code,
+          tutor_name,
+          tutor_department,
+          max_students,
+          current_students,
+          schedules (
+            id,
+            day,
+            period,
+            weeks
+          )
+        )
+      `)
+      .eq("status", "active") // only active programs
+      .order("id", { ascending: true });
+  
+    if (error) throw error;
+  
+    return data.map((program) => ({
+      ...program,
+      classes: (program.classes || []).map((cls) => ({
+        ...cls,
+        schedule: cls.schedules || [],
+      })),
+    }));
+  }
+  
 }
 
 export const programService = new ProgramService();
