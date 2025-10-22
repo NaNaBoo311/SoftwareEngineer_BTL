@@ -49,11 +49,25 @@ export default function ApiPlayground() {
         handler: async () => await studentService.getAllStudents(),
       },
       {
-        name: "getStudentProgramRegistrations",
-        description: "Fetch the programs the student is enrolled in",
+        name: "getStudentEnrollments",
+        description: "Fetch the detailed enrollments for a student",
         params: ["studentId"],
         handler: async (params) =>
-          await studentService.getStudentProgramRegistrations(params.studentId),
+          await studentService.getStudentEnrollments(params.studentId),
+      },
+      {
+        name: "enrollStudentInClass",
+        description: "Enroll a student in a specific class",
+        params: ["studentId", "classId"],
+        handler: async (params) =>
+          await studentService.enrollStudentInClass(params.studentId, params.classId),
+      },
+      {
+        name: "unenrollStudentFromClass",
+        description: "Remove a student from a class",
+        params: ["studentId", "classId"],
+        handler: async (params) =>
+          await studentService.unenrollStudentFromClass(params.studentId, params.classId),
       },
     ],
     Tutor: [

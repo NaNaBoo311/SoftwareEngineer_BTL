@@ -43,49 +43,6 @@ class StudentService {
     return formatted;
   }
 
-  async getStudentProgramRegistrations(studentId) {
-    // Step 1: fetch the programs/classes the student is enrolled in
-    const { data, error } = await supabase
-      .from("student_classes")
-      .select(`
-        id,
-        enrolled_at,
-        classes (
-          id,
-          class_code,
-          tutor_name,
-          tutor_department,
-          programs (
-            id,
-            program_code,
-            name
-          )
-        )
-      `)
-      .eq("student_id", studentId)
-      .order("enrolled_at", { ascending: false });
-
-    if (error) throw error;
-
-    // Step 2: reformat results for cleaner frontend usage
-    const enrolledPrograms = data.map((enrollment) => {
-      const cls = enrollment.classes;
-      const prog = cls?.programs;
-
-      return {
-        program_id: prog?.id,
-        program_code: prog?.program_code,
-        program_name: prog?.name,
-        class_code: cls?.class_code,
-        tutor_name: cls?.tutor_name,
-        tutor_department: cls?.tutor_department,
-        enrolled_at: enrollment.enrolled_at,
-      };
-    });
-
-    return enrolledPrograms;
-  }
-
   async insertStudent(
     fullName,
     email,
@@ -179,6 +136,173 @@ class StudentService {
         role: student.users.role,
       } : null,
     }));
+
+    return formatted;
+  }
+
+  async enrollStudentInClass(studentId, classId) {
+    // Step 1: Check if the class exists and has available spots
+    const { data: classData, error: classError } = await supabase
+      .from("classes")
+      .select("id, class_code, max_students, current_students, program_id")
+      .eq("id", classId)
+      .single();
+
+    if (classError) throw new Error(`Class not found: ${classError.message}`);
+    if (!classData) throw new Error("Class not found");
+
+    // Check if class is full
+    if (classData.current_students >= classData.max_students) {
+      throw new Error("Class is full. No available spots.");
+    }
+
+    // Step 2: Check if student is already enrolled in this class
+    const { data: existingEnrollment, error: enrollmentCheckError } = await supabase
+      .from("student_classes")
+      .select("id")
+      .eq("student_id", studentId)
+      .eq("class_id", classId)
+      .single();
+
+    if (existingEnrollment) {
+      throw new Error("Student is already enrolled in this class.");
+    }
+
+    // Step 3: Enroll the student in the class
+    const { data: enrollmentData, error: enrollmentError } = await supabase
+      .from("student_classes")
+      .insert({
+        student_id: studentId,
+        class_id: classId
+      })
+      .select()
+      .single();
+
+    if (enrollmentError) throw enrollmentError;
+
+    // Step 4: Update the current_students count in the class
+    const { error: updateError } = await supabase
+      .from("classes")
+      .update({ 
+        current_students: classData.current_students + 1 
+      })
+      .eq("id", classId);
+
+    if (updateError) {
+      // If updating the count fails, we should rollback the enrollment
+      await supabase
+        .from("student_classes")
+        .delete()
+        .eq("id", enrollmentData.id);
+      throw new Error("Failed to update class enrollment count. Enrollment cancelled.");
+    }
+
+    return {
+      enrollmentId: enrollmentData.id,
+      studentId: enrollmentData.student_id,
+      classId: enrollmentData.class_id,
+      enrolledAt: enrollmentData.enrolled_at,
+      classCode: classData.class_code,
+      programId: classData.program_id
+    };
+  }
+
+  async unenrollStudentFromClass(studentId, classId) {
+    // Step 1: Check if the enrollment exists
+    const { data: enrollmentData, error: enrollmentError } = await supabase
+      .from("student_classes")
+      .select("id")
+      .eq("student_id", studentId)
+      .eq("class_id", classId)
+      .single();
+
+    if (enrollmentError || !enrollmentData) {
+      throw new Error("Student is not enrolled in this class.");
+    }
+
+    // Step 2: Get current class data
+    const { data: classData, error: classError } = await supabase
+      .from("classes")
+      .select("id, current_students")
+      .eq("id", classId)
+      .single();
+
+    if (classError) throw new Error(`Class not found: ${classError.message}`);
+
+    // Step 3: Remove the enrollment
+    const { error: deleteError } = await supabase
+      .from("student_classes")
+      .delete()
+      .eq("id", enrollmentData.id);
+
+    if (deleteError) throw deleteError;
+
+    // Step 4: Update the current_students count in the class
+    const { error: updateError } = await supabase
+      .from("classes")
+      .update({ 
+        current_students: Math.max(0, classData.current_students - 1)
+      })
+      .eq("id", classId);
+
+    if (updateError) throw new Error("Failed to update class enrollment count.");
+
+    return {
+      success: true,
+      message: "Successfully unenrolled from class"
+    };
+  }
+
+  async getStudentEnrollments(studentId) {
+    const { data, error } = await supabase
+      .from("student_classes")
+      .select(`
+        id,
+        enrolled_at,
+        classes (
+          id,
+          class_code,
+          tutor_name,
+          tutor_department,
+          max_students,
+          current_students,
+          programs (
+            id,
+            program_code,
+            name,
+            description
+          )
+        )
+      `)
+      .eq("student_id", studentId)
+      .order("enrolled_at", { ascending: false });
+
+    if (error) throw error;
+
+    // Format the result for cleaner frontend usage
+    const formatted = data.map((enrollment) => {
+      const classData = enrollment.classes;
+      const programData = classData?.programs;
+
+      return {
+        enrollmentId: enrollment.id,
+        enrolledAt: enrollment.enrolled_at,
+        class: {
+          id: classData?.id,
+          classCode: classData?.class_code,
+          tutorName: classData?.tutor_name,
+          tutorDepartment: classData?.tutor_department,
+          maxStudents: classData?.max_students,
+          currentStudents: classData?.current_students,
+        },
+        program: programData ? {
+          id: programData.id,
+          programCode: programData.program_code,
+          name: programData.name,
+          description: programData.description,
+        } : null,
+      };
+    });
 
     return formatted;
   }

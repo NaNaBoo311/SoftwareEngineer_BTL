@@ -49,7 +49,20 @@ export default function HomePage() {
       if (!hasFetched) {
         try {
           setLoading(true);
-          const programs = await studentService.getStudentProgramRegistrations(user.details.id);
+          const enrollments = await studentService.getStudentEnrollments(user.details.id);
+          
+          // Transform enrollment data to match the expected format
+          const programs = enrollments.map(enrollment => ({
+            program_id: enrollment.program?.id,
+            program_code: enrollment.program?.programCode,
+            program_name: enrollment.program?.name,
+            class_id: enrollment.class?.id,
+            class_code: enrollment.class?.classCode,
+            tutor_name: enrollment.class?.tutorName,
+            tutor_department: enrollment.class?.tutorDepartment,
+            enrolled_at: enrollment.enrolledAt
+          }));
+          
           setCourses(programs);
           setHasFetched(true);
           
@@ -74,7 +87,20 @@ export default function HomePage() {
     
     try {
       setLoading(true);
-      const programs = await studentService.getStudentProgramRegistrations(user.details.id);
+      const enrollments = await studentService.getStudentEnrollments(user.details.id);
+      
+      // Transform enrollment data to match the expected format
+      const programs = enrollments.map(enrollment => ({
+        program_id: enrollment.program?.id,
+        program_code: enrollment.program?.programCode,
+        program_name: enrollment.program?.name,
+        class_id: enrollment.class?.id,
+        class_code: enrollment.class?.classCode,
+        tutor_name: enrollment.class?.tutorName,
+        tutor_department: enrollment.class?.tutorDepartment,
+        enrolled_at: enrollment.enrolledAt
+      }));
+      
       setCourses(programs);
       
       // Update cache
@@ -87,6 +113,7 @@ export default function HomePage() {
       setLoading(false);
     }
   };
+
 
   return (
     <div className="min-h-screen bg-gray-50 px-6 py-8">

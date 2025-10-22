@@ -1,8 +1,11 @@
 import { useState, useEffect } from "react";
-import { Search, Users, User, ChevronDown, ChevronUp } from "lucide-react";
+import { Search, Users, User, ChevronDown, ChevronUp, X } from "lucide-react";
 import { programService } from "../services/programService";
+import { studentService } from "../services/studentService";
+import { useUser } from "../context/UserContext";
 
 export default function Register() {
+  const { user } = useUser();
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [expandedPrograms, setExpandedPrograms] = useState({});
@@ -10,24 +13,40 @@ export default function Register() {
   const [showModal, setShowModal] = useState(false);
   const [programs, setPrograms] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [registering, setRegistering] = useState(false);
+  const [studentEnrollments, setStudentEnrollments] = useState([]);
+  const [unregistering, setUnregistering] = useState({});
 
   // Fetch programs for registration
-  useEffect(() => {
-    const fetchPrograms = async () => {
-      try {
-        setLoading(true);
-        const data = await programService.getProgramsForRegistration();
-        setPrograms(data);
-      } catch (error) {
-        console.error("Error fetching programs:", error);
-        // You might want to show an error message to the user
-      } finally {
-        setLoading(false);
-      }
-    };
+  const fetchPrograms = async () => {
+    try {
+      setLoading(true);
+      const data = await programService.getProgramsForRegistration();
+      setPrograms(data);
+    } catch (error) {
+      console.error("Error fetching programs:", error);
+      // You might want to show an error message to the user
+    } finally {
+      setLoading(false);
+    }
+  };
 
+  // Fetch student enrollments to check if already enrolled
+  const fetchStudentEnrollments = async () => {
+    if (!user || !user.details?.id || user.role !== "student") return;
+    
+    try {
+      const enrollments = await studentService.getStudentEnrollments(user.details.id);
+      setStudentEnrollments(enrollments);
+    } catch (error) {
+      console.error("Error fetching student enrollments:", error);
+    }
+  };
+
+  useEffect(() => {
     fetchPrograms();
-  }, []);
+    fetchStudentEnrollments();
+  }, [user]);
 
 
   
@@ -69,18 +88,89 @@ export default function Register() {
     return `${days} Period ${period}`;
   };
 
-  const confirmRegistration = () => {
-    alert(
-      `Successfully registered for ${selectedClass.class.class_code} with ${selectedClass.class.tutor_name}!`
-    );
-    setShowModal(false);
-    setSelectedClass(null);
+  const confirmRegistration = async () => {
+    if (!user || !user.details?.id) {
+      alert("You must be logged in to register for classes.");
+      return;
+    }
+
+    try {
+      setRegistering(true);
+      
+      // Enroll the student in the class
+      const result = await studentService.enrollStudentInClass(
+        user.details.id, // studentId
+        selectedClass.class.id // classId
+      );
+
+      alert(
+        `Successfully registered for ${selectedClass.class.class_code} with ${selectedClass.class.tutor_name}!`
+      );
+      
+      // Clear the modal and selected class
+      setShowModal(false);
+      setSelectedClass(null);
+      
+      // Refresh the programs list and student enrollments
+      await fetchPrograms();
+      await fetchStudentEnrollments();
+      
+    } catch (error) {
+      console.error("Registration error:", error);
+      alert(`Registration failed: ${error.message}`);
+    } finally {
+      setRegistering(false);
+    }
+  };
+
+  // Unregister from a class
+  const handleUnregister = async (classId) => {
+    if (!user || !user.details?.id) {
+      alert("You must be logged in to unregister from classes.");
+      return;
+    }
+
+    if (!window.confirm("Are you sure you want to unregister from this class?")) {
+      return;
+    }
+
+    try {
+      setUnregistering(prev => ({ ...prev, [classId]: true }));
+      
+      await studentService.unenrollStudentFromClass(user.details.id, classId);
+      
+      alert("Successfully unregistered from the class!");
+      
+      // Refresh the programs list and student enrollments
+      await fetchPrograms();
+      await fetchStudentEnrollments();
+      
+    } catch (error) {
+      console.error("Unregistration error:", error);
+      alert(`Unregistration failed: ${error.message}`);
+    } finally {
+      setUnregistering(prev => ({ ...prev, [classId]: false }));
+    }
   };
 
   const isFull = (classData) =>
     classData.current_students >= classData.max_students;
-  const canRegister = (program, classData) =>
-    program.status === "active" && !isFull(classData);
+  
+  const isAlreadyEnrolled = (classId) => {
+    return studentEnrollments.some(enrollment => enrollment.class?.id === classId);
+  };
+  
+  const isEnrolledInProgram = (programId) => {
+    return studentEnrollments.some(enrollment => enrollment.program?.id === programId);
+  };
+  
+  const canRegister = (program, classData) => {
+    if (program.status !== "active") return false;
+    if (isFull(classData)) return false;
+    if (isAlreadyEnrolled(classData.id)) return false;
+    if (isEnrolledInProgram(program.id)) return false; // One class per program
+    return true;
+  };
 
   const getTotalEnrolled = (classes) => {
     return classes.reduce((sum, cls) => sum + cls.current_students, 0);
@@ -227,23 +317,38 @@ export default function Register() {
                                 students
                               </div>
                             </div>
-                            <button
-                              onClick={() => handleRegister(program, classData)}
-                              disabled={!canRegister(program, classData)}
-                              className={`px-6 py-2 rounded-lg font-medium transition-colors ${
-                                canRegister(program, classData)
-                                  ? "bg-blue-600 text-white hover:bg-blue-700"
-                                  : "bg-gray-300 text-gray-500 cursor-not-allowed"
-                              }`}
-                            >
-                              {isFull(classData)
-                                ? "Full"
-                                : program.status === "completed"
-                                ? "Completed"
-                                : program.status === "upcoming"
-                                ? "Coming Soon"
-                                : "Register"}
-                            </button>
+                            <div className="flex gap-2">
+                              {isAlreadyEnrolled(classData.id) ? (
+                                <button
+                                  onClick={() => handleUnregister(classData.id)}
+                                  disabled={unregistering[classData.id]}
+                                  className="flex items-center gap-1 px-4 py-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                  <X className="w-4 h-4" />
+                                  {unregistering[classData.id] ? "Unregistering..." : "Unregister"}
+                                </button>
+                              ) : (
+                                <button
+                                  onClick={() => handleRegister(program, classData)}
+                                  disabled={!canRegister(program, classData)}
+                                  className={`px-6 py-2 rounded-lg font-medium transition-colors ${
+                                    canRegister(program, classData)
+                                      ? "bg-blue-600 text-white hover:bg-blue-700"
+                                      : "bg-gray-300 text-gray-500 cursor-not-allowed"
+                                  }`}
+                                >
+                                  {isEnrolledInProgram(program.id)
+                                    ? "Already in Program"
+                                    : isFull(classData)
+                                    ? "Full"
+                                    : program.status === "completed"
+                                    ? "Completed"
+                                    : program.status === "upcoming"
+                                    ? "Coming Soon"
+                                    : "Register"}
+                                </button>
+                              )}
+                            </div>
                           </div>
                         </div>
 
@@ -375,15 +480,17 @@ export default function Register() {
             <div className="flex gap-3">
               <button
                 onClick={() => setShowModal(false)}
-                className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-medium"
+                disabled={registering}
+                className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Cancel
               </button>
               <button
                 onClick={confirmRegistration}
-                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium"
+                disabled={registering}
+                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Confirm
+                {registering ? "Registering..." : "Confirm"}
               </button>
             </div>
           </div>
