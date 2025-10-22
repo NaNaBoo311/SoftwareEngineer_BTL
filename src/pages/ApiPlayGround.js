@@ -45,10 +45,17 @@ export default function ApiPlayground() {
           await studentService.getStudentInfoByCode(params.studentCode),
       },
       {
-        name: "getAllStudent",
+        name: "getAllStudents",
         description: "Get all students available in the system",
         params: [],
-        handler: async () => await studentService.getAllStudent(),
+        handler: async () => await studentService.getAllStudents(),
+      },
+      {
+        name: "getStudentProgramRegistrations",
+        description: "Fetch the programs the student is enrolled in",
+        params: ["studentId"],
+        handler: async (params) =>
+          await studentService.getStudentProgramRegistrations(params.studentId),
       },
     ],
     Tutor: [
