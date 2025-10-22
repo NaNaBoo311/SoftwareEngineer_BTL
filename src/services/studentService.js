@@ -3,11 +3,44 @@ import { supabase } from "../lib/supabaseClient";
 
 class StudentService {
   async getStudentInfoByCode(studentCode) {
-    const { data, error } = await supabase.rpc("get_student_info_by_code", {
-      p_student_code: studentCode,
-    });
+    const { data, error } = await supabase
+      .from("students")
+      .select(`
+        id,
+        student_code,
+        major,
+        faculty,
+        created_at,
+        updated_at,
+        users:user_id (
+          id,
+          full_name,
+          email,
+          role
+        )
+      `)
+      .eq("student_code", studentCode)
+      .single();
+
     if (error) throw error;
-    return data;
+
+    // Format the result for cleaner frontend usage
+    const formatted = {
+      id: data.id,
+      student_code: data.student_code,
+      major: data.major,
+      faculty: data.faculty,
+      created_at: data.created_at,
+      updated_at: data.updated_at,
+      user: data.users ? {
+        id: data.users.id,
+        full_name: data.users.full_name,
+        email: data.users.email,
+        role: data.users.role,
+      } : null,
+    };
+
+    return formatted;
   }
 
   async getStudentProgramRegistrations(studentId) {
@@ -58,7 +91,6 @@ class StudentService {
     email,
     password,
     studentCode,
-    program,
     major,
     faculty = "Computer Science and Engineering"
   ) {
@@ -78,20 +110,37 @@ class StudentService {
     const userId = signUpData.user?.id;
     if (!userId) throw new Error("User ID not returned from Supabase Auth.");
 
-    // Step 2: Insert into custom users + students tables
-    const { data, error } = await supabase.rpc("insert_student_profile", {
-      p_user_id: userId,
-      p_full_name: fullName,
-      p_email: email,
-      p_student_code: studentCode,
-      p_program: program,
-      p_major: major,
-      p_faculty: faculty,
-    });
+    // Step 2: Insert into users table
+    const { error: userError } = await supabase
+      .from("users")
+      .insert({
+        id: userId,
+        full_name: fullName,
+        email: email,
+        role: "student"
+      });
 
-    if (error) throw error;
+    if (userError) throw userError;
 
-    return { userId };
+    // Step 3: Insert into students table
+    const { data: studentData, error: studentError } = await supabase
+      .from("students")
+      .insert({
+        user_id: userId,
+        student_code: studentCode,
+        major: major,
+        faculty: faculty
+      })
+      .select()
+      .single();
+
+    if (studentError) throw studentError;
+
+    return { 
+      userId, 
+      studentId: studentData.id,
+      studentCode: studentData.student_code 
+    };
   }
 
   async getAllStudents() {
@@ -100,7 +149,6 @@ class StudentService {
       .select(`
         id,
         student_code,
-        program,
         major,
         faculty,
         created_at,
@@ -120,7 +168,6 @@ class StudentService {
     const formatted = data.map((student) => ({
       id: student.id,
       student_code: student.student_code,
-      program: student.program,
       major: student.major,
       faculty: student.faculty,
       created_at: student.created_at,

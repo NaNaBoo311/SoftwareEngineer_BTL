@@ -22,7 +22,6 @@ export default function ApiPlayground() {
           "email",
           "password",
           "studentCode",
-          "program",
           "major",
           "faculty",
         ],
@@ -32,7 +31,6 @@ export default function ApiPlayground() {
             params.email,
             params.password,
             params.studentCode,
-            params.program,
             params.major,
             params.faculty
           ),
@@ -120,6 +118,12 @@ export default function ApiPlayground() {
         description: "Get the current login user",
         params: [],
         handler: async () => await authService.getUser(),
+      },
+      {
+        name: "getUserProfile",
+        description: "Get the current login user",
+        params: [],
+        handler: async () => await authService.getUserProfile(),
       },
       {
         name: "deleteUserAccount",
