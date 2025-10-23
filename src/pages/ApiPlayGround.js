@@ -80,7 +80,6 @@ export default function ApiPlayground() {
           "email",
           "password",
           "tutorCode",
-          "program",
           "faculty",
           "title",
         ],
@@ -90,7 +89,6 @@ export default function ApiPlayground() {
             params.email,
             params.password,
             params.tutorCode,
-            params.program,
             params.faculty,
             params.title
           ),
@@ -152,14 +150,15 @@ export default function ApiPlayground() {
       {
         name: "insertProgram",
         description: "Insert a program to the system.",
-        params: ["name", "code", "description", "faculty", "maxStudent"],
+        params: ["name", "code", "description", "faculty", "maxStudents", "numClasses"],
         handler: async (params) =>
           await programService.insertProgram(
             params.name,
             params.code,
-            (params.description = null),
+            params.description,
             params.faculty,
-            (params.maxStudents = 30)
+            params.maxStudents,
+            params.numClasses 
           ),
       },
       {

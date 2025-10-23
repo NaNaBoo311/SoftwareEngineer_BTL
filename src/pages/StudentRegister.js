@@ -4,7 +4,7 @@ import { programService } from "../services/programService";
 import { studentService } from "../services/studentService";
 import { useUser } from "../context/UserContext";
 
-export default function Register() {
+export default function StudentRegister() {
   const { user } = useUser();
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("all");

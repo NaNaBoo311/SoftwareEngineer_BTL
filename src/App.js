@@ -3,12 +3,12 @@ import Layout from "./Layout";
 import Login from "./pages/Login";
 import HomePage from "./pages/HomePage";
 import ProfilePage from "./pages/ProfilePage";
-import Register from "./pages/Register";
+import StudentRegister from "./pages/StudentRegister";
 import CoursePage from "./pages/CoursePage";
 import FloatingMenu from "./components/FloatingMenu";
 import ApiPlayground from "./pages/ApiPlayGround";
 import ProtectedRoute from "./components/ProtectedRoute";
-
+import TutorRegister from "./pages/TutorRegister";
 import { UserProvider } from "./context/UserContext";
 
 export default function App() {
@@ -52,11 +52,11 @@ export default function App() {
           />
 
           <Route
-            path="/register"
+            path="/student-register"
             element={
               <ProtectedRoute>
                 <Layout>
-                  <Register />
+                  <StudentRegister />
                 </Layout>
               </ProtectedRoute>
             }
@@ -67,6 +67,14 @@ export default function App() {
             element={
               <Layout>
                 <ApiPlayground />
+              </Layout>
+            }
+          />
+          <Route
+            path="/tutor-register"
+            element={
+              <Layout>
+                <TutorRegister />
               </Layout>
             }
           />

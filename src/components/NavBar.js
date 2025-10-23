@@ -27,11 +27,11 @@ export default function Navbar() {
         <Link to="/home" className="hover:text-gray-300">
           Home
         </Link>
-        <Link to="/classes" className="hover:text-gray-300">
-          Classes
+        <Link to="/tutor-register" className="hover:text-gray-300">
+          TutorRegister
         </Link>
-        <Link to="/register" className="hover:text-gray-300">
-          Register
+        <Link to="/student-register" className="hover:text-gray-300">
+          StudentRegister
         </Link>
         <Link to="/support" className="hover:text-gray-300">
           Support

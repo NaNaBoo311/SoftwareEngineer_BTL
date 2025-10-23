@@ -6,20 +6,51 @@ class ProgramService {
     code,
     description = null,
     faculty = "Computer Science and Engineering",
-    maxStudents = 30
+    maxStudents = 30,
+    numClasses = 1
   ) {
-    const { data, error } = await supabase.rpc("insert_program", {
-      p_name: name,
-      p_code: code,
-      p_description: description,
-      p_faculty: faculty,
-      p_max_students: maxStudents,
-    });
-
-    if (error) throw error;
-    return data;
+    // Step 1: Insert the program
+    const { data: program, error: programError } = await supabase
+      .from("programs")
+      .insert([
+        {
+          program_code: code,
+          name,
+          description,
+          category: faculty,
+          max_student: maxStudents,
+          num_classes: numClasses,
+        },
+      ])
+      .select()
+      .single();
+  
+    if (programError) throw programError;
+  
+    // Step 2: Create corresponding classes
+    const classesToInsert = [];
+    for (let i = 1; i <= numClasses; i++) {
+      const classCode = `CC${String(i).padStart(2, "0")}`;
+      classesToInsert.push({
+        class_code: classCode,
+        program_id: program.id,
+        max_students: maxStudents,
+      });
+    }
+  
+    const { error: classError } = await supabase
+      .from("classes")
+      .insert(classesToInsert);
+  
+    if (classError) throw classError;
+  
+    // Step 3: Return the created program with its classes
+    return {
+      ...program,
+      classes: classesToInsert,
+    };
   }
-
+  
   async getAllPrograms() {
     const { data, error } = await supabase
       .from("programs")
