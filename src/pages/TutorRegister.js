@@ -49,29 +49,30 @@ const TutorRegister = () => {
     { id: 6, name: 'Saturday', short: 'Sat' }
   ];
 
+  // Function to load data
+  const loadData = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      // Load programs with classes
+      const programsData = await programService.getProgramsWithClasses();
+      setPrograms(programsData);
+      
+      // Load taken schedules
+      const takenSchedulesData = await programService.getTakenSchedules();
+      setTakenSchedules(takenSchedulesData);
+      
+    } catch (err) {
+      console.error('Error loading data:', err);
+      setError('Failed to load programs and schedules. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Load programs and taken schedules on component mount
   useEffect(() => {
-    const loadData = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-        
-        // Load programs with classes
-        const programsData = await programService.getProgramsWithClasses();
-        setPrograms(programsData);
-        
-        // Load taken schedules
-        const takenSchedulesData = await programService.getTakenSchedules();
-        setTakenSchedules(takenSchedulesData);
-        
-      } catch (err) {
-        console.error('Error loading data:', err);
-        setError('Failed to load programs and schedules. Please try again.');
-      } finally {
-        setLoading(false);
-      }
-    };
-
     loadData();
   }, []);
 
@@ -353,7 +354,15 @@ const TutorRegister = () => {
         setLoading(true);
         await programService.unregisterTutorFromClass(selectedClass.id);
         alert('Successfully unregistered from the class!');
-        navigate('/tutor-register');
+        
+        // Refresh data to show updated class status
+        await loadData();
+        
+        // Reset form state
+        setSelectedClass(null);
+        setSelectedWeeks([]);
+        setWeekConfigurations({});
+        setCurrentStep(1);
       } catch (error) {
         console.error('Unregister failed:', error);
         alert('Unregister failed: ' + error.message);
@@ -368,8 +377,9 @@ const TutorRegister = () => {
       setLoading(true);
       await programService.unregisterTutorFromClass(classId);
       alert('Successfully unregistered from the class!');
-      // Reload the data to reflect changes
-      window.location.reload();
+      
+      // Refresh data to show updated class status
+      await loadData();
     } catch (error) {
       console.error('Unregister failed:', error);
       alert('Unregister failed: ' + error.message);
@@ -420,6 +430,15 @@ const TutorRegister = () => {
         await programService.saveSchedulesForClass(selectedClass.id, weekConfigurations, tutorInfo);
         alert('Tutor assignment successful!');
       }
+      
+      // Refresh data to show updated class status
+      await loadData();
+      
+      // Reset form state
+      setSelectedClass(null);
+      setSelectedWeeks([]);
+      setWeekConfigurations({});
+      setCurrentStep(1);
       
     } catch (error) {
       console.error('Assignment failed:', error);
