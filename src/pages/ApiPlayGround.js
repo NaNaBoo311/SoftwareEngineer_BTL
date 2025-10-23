@@ -16,7 +16,7 @@ export default function ApiPlayground() {
     Student: [
       {
         name: "insertStudent",
-        description: "1/ Register student account.\n2/ Insert student profile.",
+        description: "List of major:\n 1/ Computer Science\n 2/ Computer Engineering\n 3/ Automotive Engineering\n 4/ Aerospace Engineering\n 5/ Architecture\n 6/ Biotechnology\n 7/ Industrial Management (Minor: Business Administration / Operations & Supply Chain Management)\n 8/ Civil Engineering\n 9/ Chemical Engineering\n 10/ Electrical Electronics Engineering\n 11/ Environmental Engineering\n 12/ Food Technology\n 13/ Logistics & Supply Chain Management\n 14/ Advanced Materials Engineering\n 15/ Mechanical Engineering\n 16/ Mechatronics Engineering\n 17/ Mechatronics Engineering (Minor: Robot Engineering)\n 18/ Natural Resources & Environmental Management\n 19/ Petroleum Engineering\n 20/ Physics Engineering (Minor: Biomedical Engineering)",
         params: [
           "fullName",
           "email",
@@ -150,7 +150,7 @@ export default function ApiPlayground() {
       {
         name: "insertProgram",
         description: "Insert a program to the system.",
-        params: ["name", "code", "description", "faculty", "maxStudents", "numClasses"],
+        params: ["name", "code", "description", "faculty", "maxStudents", "numClasses", "periodPerWeek", "numberOfWeek"],
         handler: async (params) =>
           await programService.insertProgram(
             params.name,
@@ -158,7 +158,9 @@ export default function ApiPlayground() {
             params.description,
             params.faculty,
             params.maxStudents,
-            params.numClasses 
+            params.numClasses, 
+            params.periodPerWeek,
+            params.numberOfWeek,
           ),
       },
       {
@@ -178,6 +180,18 @@ export default function ApiPlayground() {
         description: "Get all the program for registration",
         params: [],
         handler: async () => programService.getProgramsForRegistration(),
+      },
+      {
+        name: "getProgramsWithClasses",
+        description: "Get all the program with its classes",
+        params: [],
+        handler: async () => programService.getProgramsWithClasses(),
+      },
+      {
+        name: "getTakenSchedules",
+        description: "Get all the taken schedules",
+        params: [],
+        handler: async () => programService.getTakenSchedules(),
       },
       {
         name: "deleteProgram",

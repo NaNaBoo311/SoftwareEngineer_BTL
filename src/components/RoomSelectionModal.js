@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 
-const RoomSelectionModal = ({ isOpen, onClose, onSelectRoom, selectedRoom: initialRoom, takenSchedules = [] }) => {
+const RoomSelectionModal = ({ isOpen, onClose, onSelectRoom, selectedRoom: initialRoom, takenSchedules = [], currentTimeSlot = null, currentClassCode = null }) => {
   const [selectedBuilding, setSelectedBuilding] = useState('');
   const [selectedFloor, setSelectedFloor] = useState('');
   const [selectedRoom, setSelectedRoom] = useState('');
@@ -75,19 +75,41 @@ const RoomSelectionModal = ({ isOpen, onClose, onSelectRoom, selectedRoom: initi
   const isRoomTaken = (room) => {
     if (!takenSchedules || takenSchedules.length === 0) return false;
     
-    return takenSchedules.some(schedule => 
-      schedule.schedules.some(s => {
-        // Check if the room code matches (e.g., A1-101)
-        const roomCode = room.split(' ')[0]; // Extract just the room code part
-        return s.room.includes(roomCode);
-      })
-    );
+    return takenSchedules.some(schedule => {
+      return schedule.schedules.some(s => {
+        // If we have currentTimeSlot, check for exact conflict at that specific time
+        if (currentTimeSlot) {
+          const isExactMatch = s.week === currentTimeSlot.week && 
+                 s.day === currentTimeSlot.day && 
+                 s.period === currentTimeSlot.period && 
+                 s.room === room;
+          
+          if (!isExactMatch) return false;
+          
+          // If it's an exact match, check if it's from the current tutor's class
+          const isCurrentTutorClass = currentClassCode && 
+            schedule.class_code === currentClassCode;
+          
+          // Only consider it a conflict if it's NOT from the current tutor's class
+          return !isCurrentTutorClass;
+        }
+        
+        // If no currentTimeSlot, check if room is taken at any time slot
+        // but still exclude current tutor's class
+        const isCurrentTutorClass = currentClassCode && 
+          schedule.class_code === currentClassCode;
+        
+        if (isCurrentTutorClass) return false;
+        
+        return s.room === room;
+      });
+    });
   };
 
   const handleConfirm = () => {
     if (selectedBuilding && selectedFloor && selectedRoom) {
-      const fullRoomName = `${selectedRoom} (${buildings.find(b => b.id === selectedBuilding)?.name}, ${selectedFloor})`;
-      onSelectRoom(fullRoomName);
+      // Return only the room code (e.g., "A1-101") instead of full description
+      onSelectRoom(selectedRoom);
       onClose();
     }
   };

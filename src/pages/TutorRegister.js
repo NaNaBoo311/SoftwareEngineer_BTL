@@ -3,9 +3,11 @@ import { useNavigate } from 'react-router-dom';
 import { tutorService } from '../services/tutorService';
 import { programService } from '../services/programService';
 import RoomSelectionModal from '../components/RoomSelectionModal';
+import { useUser } from '../context/UserContext';
 
 const TutorRegister = () => {
   const navigate = useNavigate();
+  const { user, loading: userLoading } = useUser();
   const [currentStep, setCurrentStep] = useState(1);
   const [selectedProgram, setSelectedProgram] = useState(null);
   const [selectedClass, setSelectedClass] = useState(null);
@@ -15,60 +17,11 @@ const TutorRegister = () => {
   const [showRoomModal, setShowRoomModal] = useState(false);
   const [selectedRoom, setSelectedRoom] = useState('');
 
-  // Dummy data for programs with taken schedules
-  const [programs, setPrograms] = useState([
-    {
-      id: 1,
-      name: 'Software Engineering',
-      program_code: 'SE101',
-      description: 'Introduction to Software Engineering',
-      period_of_week: 2,
-      number_of_week: 7,
-      start_week: 35,
-      end_week: 50,
-      classes: [
-        { id: 1, class_code: 'CC01', tutor_name: null, available: true },
-        { id: 2, class_code: 'CC02', tutor_name: 'Dr. Smith', available: false },
-        { id: 3, class_code: 'CC03', tutor_name: null, available: true }
-      ]
-    },
-    {
-      id: 2,
-      name: 'Data Structures',
-      program_code: 'DS201',
-      description: 'Advanced Data Structures and Algorithms',
-      period_of_week: 3,
-      number_of_week: 10,
-      start_week: 30,
-      end_week: 45,
-      classes: [
-        { id: 4, class_code: 'CC04', tutor_name: null, available: true },
-        { id: 5, class_code: 'CC05', tutor_name: 'Prof. Johnson', available: false }
-      ]
-    }
-  ]);
-
-  // Dummy data for taken schedules to prevent overlap
-  const [takenSchedules, setTakenSchedules] = useState([
-    {
-      class_code: 'CC02',
-      tutor_name: 'Dr. Smith',
-      schedules: [
-        { week: 35, day: 1, period: 1, room: 'A1-101 (Building A1 - Computer Science, 1st Floor)' },
-        { week: 36, day: 1, period: 1, room: 'A1-101 (Building A1 - Computer Science, 1st Floor)' },
-        { week: 37, day: 1, period: 1, room: 'A1-101 (Building A1 - Computer Science, 1st Floor)' }
-      ]
-    },
-    {
-      class_code: 'CC05',
-      tutor_name: 'Prof. Johnson',
-      schedules: [
-        { week: 30, day: 2, period: 2, room: 'B1-201 (Building B1 - Mathematics, 2nd Floor)' },
-        { week: 31, day: 2, period: 2, room: 'B1-201 (Building B1 - Mathematics, 2nd Floor)' },
-        { week: 32, day: 2, period: 2, room: 'B1-201 (Building B1 - Mathematics, 2nd Floor)' }
-      ]
-    }
-  ]);
+  // State for programs and taken schedules
+  const [programs, setPrograms] = useState([]);
+  const [takenSchedules, setTakenSchedules] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   // Available periods (individual periods, range 1-12)
   const periods = [
@@ -95,6 +48,87 @@ const TutorRegister = () => {
     { id: 5, name: 'Friday', short: 'Fri' },
     { id: 6, name: 'Saturday', short: 'Sat' }
   ];
+
+  // Load programs and taken schedules on component mount
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        
+        // Load programs with classes
+        const programsData = await programService.getProgramsWithClasses();
+        setPrograms(programsData);
+        
+        // Load taken schedules
+        const takenSchedulesData = await programService.getTakenSchedules();
+        setTakenSchedules(takenSchedulesData);
+        
+      } catch (err) {
+        console.error('Error loading data:', err);
+        setError('Failed to load programs and schedules. Please try again.');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadData();
+  }, []);
+
+  // Load existing schedules when a class is selected for modification
+  useEffect(() => {
+    if (selectedClass && user) {
+      const isCurrentTutor = selectedClass.tutor_id === user.details.id;
+      
+      if (isCurrentTutor) {
+        // Load existing schedules for this class
+        const loadExistingSchedules = async () => {
+          try {
+            // Find existing schedules for this class
+            const classSchedules = takenSchedules.find(schedule => 
+              schedule.class_code === selectedClass.class_code
+            );
+            
+            if (classSchedules && classSchedules.schedules) {
+              // Convert existing schedules to weekConfigurations format
+              const existingConfig = {};
+              
+              classSchedules.schedules.forEach(schedule => {
+                const week = schedule.week;
+                if (!existingConfig[week]) {
+                  existingConfig[week] = { periods: [] };
+                }
+                existingConfig[week].periods.push({
+                  day: schedule.day,
+                  period: schedule.period,
+                  room: schedule.room
+                });
+              });
+              
+              // Only set the configurations, don't trigger any updates
+              setWeekConfigurations(existingConfig);
+              
+              // Set selected weeks based on existing schedules
+              const weeks = Object.keys(existingConfig).map(Number).sort((a, b) => a - b);
+              setSelectedWeeks(weeks);
+            } else {
+              // If no existing schedules, reset the configurations
+              setWeekConfigurations({});
+              setSelectedWeeks([]);
+            }
+          } catch (err) {
+            console.error('Error loading existing schedules:', err);
+          }
+        };
+        
+        loadExistingSchedules();
+      } else {
+        // If not current tutor, reset configurations
+        setWeekConfigurations({});
+        setSelectedWeeks([]);
+      }
+    }
+  }, [selectedClass, user, takenSchedules]);
 
   // Generate available weeks based on program constraints
   const getAvailableWeeks = (program) => {
@@ -151,7 +185,11 @@ const TutorRegister = () => {
   };
 
   const handleClassSelect = (classItem) => {
-    if (classItem.available) {
+    console.log("Class Item", classItem);
+    // Allow selection if class is available OR if current user is the assigned tutor
+    const isCurrentTutor = user && classItem.tutor_id === user.details.id;
+    
+    if (classItem.available || isCurrentTutor) {
       setSelectedClass(classItem);
       setCurrentStep(3);
     }
@@ -173,6 +211,20 @@ const TutorRegister = () => {
 
   const handleWeekConfiguration = (week, day, period, room) => {
     const currentConfig = weekConfigurations[week] || { periods: [] };
+    
+    // Check if we're trying to add more periods than allowed
+    if (currentConfig.periods.length >= selectedProgram?.period_per_week) {
+      alert(`You can only have ${selectedProgram?.period_per_week} period(s) per week for this program.`);
+      return;
+    }
+    
+    // Check if this specific slot is already configured
+    const isSlotAlreadyConfigured = currentConfig.periods.some(p => p.day === day && p.period === period);
+    if (isSlotAlreadyConfigured) {
+      alert('This time slot is already configured for this week.');
+      return;
+    }
+    
     const newPeriods = [...currentConfig.periods, { day, period, room }];
     
     setWeekConfigurations({
@@ -237,8 +289,8 @@ const TutorRegister = () => {
     const config = weekConfigurations[week];
     if (!config || !config.periods) return false;
     
-    // Check if this week has the required number of periods
-    return config.periods.length >= selectedProgram?.period_of_week;
+    // Check if this week has exactly the required number of periods
+    return config.periods.length === selectedProgram?.period_per_week;
   };
 
   const canSelectSlot = (week, day, period) => {
@@ -272,6 +324,60 @@ const TutorRegister = () => {
     setWeekConfigurations(newConfigs);
   };
 
+  const clearWeekConfiguration = (week) => {
+    if (window.confirm(`Are you sure you want to clear all configurations for Week ${week}?`)) {
+      const newConfigs = { ...weekConfigurations };
+      delete newConfigs[week];
+      setWeekConfigurations(newConfigs);
+    }
+  };
+
+  const clearAllConfigurations = () => {
+    if (window.confirm('Are you sure you want to clear ALL week configurations? This action cannot be undone.')) {
+      setWeekConfigurations({});
+      setSelectedWeeks([]);
+    }
+  };
+
+  const handleUnregister = async () => {
+    if (!selectedClass || !user) return;
+    
+    const isCurrentTutor = selectedClass.tutor_id === user.details.id;
+    if (!isCurrentTutor) {
+      alert('You can only unregister from classes you are assigned to.');
+      return;
+    }
+    
+    if (window.confirm(`Are you sure you want to unregister from class ${selectedClass.class_code}? This will remove all your schedules and make the class available for other tutors.`)) {
+      try {
+        setLoading(true);
+        await programService.unregisterTutorFromClass(selectedClass.id);
+        alert('Successfully unregistered from the class!');
+        navigate('/tutor-register');
+      } catch (error) {
+        console.error('Unregister failed:', error);
+        alert('Unregister failed: ' + error.message);
+      } finally {
+        setLoading(false);
+      }
+    }
+  };
+
+  const handleUnregisterFromClass = async (classId) => {
+    try {
+      setLoading(true);
+      await programService.unregisterTutorFromClass(classId);
+      alert('Successfully unregistered from the class!');
+      // Reload the data to reflect changes
+      window.location.reload();
+    } catch (error) {
+      console.error('Unregister failed:', error);
+      alert('Unregister failed: ' + error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const [currentConfiguringWeek, setCurrentConfiguringWeek] = useState(null);
   const [currentConfiguringSlot, setCurrentConfiguringSlot] = useState(null);
 
@@ -283,59 +389,156 @@ const TutorRegister = () => {
       return;
     }
 
-    // Check if all selected weeks have configurations
-    const allWeeksConfigured = selectedWeeks.every(week => weekConfigurations[week]);
+    // Check if all selected weeks have the correct number of periods
+    const allWeeksConfigured = selectedWeeks.every(week => {
+      const config = weekConfigurations[week];
+      return config && config.periods && config.periods.length === selectedProgram?.period_per_week;
+    });
+    
     if (!allWeeksConfigured) {
-      alert('Please configure all selected weeks.');
+      alert(`Please configure all selected weeks with exactly ${selectedProgram?.period_per_week} period(s) each.`);
       return;
     }
-
     try {
-      // Here you would assign the tutor to the class with their selected weeks and configurations
-      // This would require additional API calls to update the class assignment
+      setLoading(true);
       
-      alert('Tutor assignment successful!');
-      navigate('/');
+      // Prepare tutor information
+      const tutorInfo = user ? {
+        id: user.details.id,
+        name: user.full_name || user.email || 'Unknown Tutor'
+      } : null;
+      
+      // Check if this is a modification of existing assignment
+      const isModification = user && selectedClass?.tutor_id === user.details.id;
+      
+      if (isModification) {
+        // Update existing tutor assignment
+        await programService.updateTutorAssignment(selectedClass.id, weekConfigurations, tutorInfo);
+        alert('Tutor assignment updated successfully!');
+      } else {
+        // Create new tutor assignment
+        await programService.saveSchedulesForClass(selectedClass.id, weekConfigurations, tutorInfo);
+        alert('Tutor assignment successful!');
+      }
+      
     } catch (error) {
+      console.error('Assignment failed:', error);
       alert('Assignment failed: ' + error.message);
+    } finally {
+      setLoading(false);
     }
   };
 
-  const renderStep1 = () => (
-    <div className="max-w-6xl mx-auto p-8">
-      <div className="text-center mb-12">
-        <h1 className="text-4xl font-bold text-gray-800 mb-4">🎓 Tutor Class Assignment</h1>
-        <p className="text-lg text-gray-600">Choose a program and assign yourself to a class</p>
-      </div>
-      
-      <div className="mb-8">
-        <h3 className="text-2xl font-bold text-gray-800 mb-8 text-center">📚 Select Program to Teach</h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-          {programs.map((program) => (
-            <div
-              key={program.id}
-              className="group bg-white border-2 border-gray-200 rounded-2xl p-8 cursor-pointer hover:border-blue-300 hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1"
-              onClick={() => handleProgramSelect(program)}
+  const renderStep1 = () => {
+    if (userLoading) {
+      return (
+        <div className="max-w-6xl mx-auto p-8">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+            <p className="text-lg text-gray-600">Loading user information...</p>
+          </div>
+        </div>
+      );
+    }
+
+    if (!user) {
+      return (
+        <div className="max-w-6xl mx-auto p-8">
+          <div className="text-center">
+            <div className="text-red-600 text-6xl mb-4">🔒</div>
+            <h2 className="text-2xl font-bold text-gray-800 mb-4">Authentication Required</h2>
+            <p className="text-lg text-gray-600 mb-6">Please log in to register as a tutor.</p>
+            <button
+              onClick={() => navigate('/')}
+              className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
             >
-              <div className="flex items-center mb-4">
-                <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center mr-4">
-                  <span className="text-2xl">📖</span>
-                </div>
-                <div>
-                  <h4 className="font-bold text-xl text-gray-800">{program.name}</h4>
-                  <p className="text-blue-600 font-medium">{program.program_code}</p>
-                </div>
-              </div>
-              <p className="text-gray-600 leading-relaxed">{program.description}</p>
-              <div className="mt-4 flex items-center text-sm text-gray-500">
-                <span className="bg-gray-100 px-3 py-1 rounded-full">Click to select</span>
-              </div>
+              Go to Login
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    if (loading) {
+      return (
+        <div className="max-w-6xl mx-auto p-8">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+            <p className="text-lg text-gray-600">Loading programs...</p>
+          </div>
+        </div>
+      );
+    }
+
+    if (error) {
+      return (
+        <div className="max-w-6xl mx-auto p-8">
+          <div className="text-center">
+            <div className="text-red-600 text-6xl mb-4">⚠️</div>
+            <h2 className="text-2xl font-bold text-gray-800 mb-4">Error Loading Data</h2>
+            <p className="text-lg text-gray-600 mb-6">{error}</p>
+            <button
+              onClick={() => window.location.reload()}
+              className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              Try Again
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div className="max-w-6xl mx-auto p-8">
+        <div className="text-center mb-12">
+          <h1 className="text-4xl font-bold text-gray-800 mb-4">🎓 Tutor Class Assignment</h1>
+          <p className="text-lg text-gray-600">Choose a program and assign yourself to a class</p>
+          {user && (
+            <div className="mt-4 inline-block bg-blue-50 border border-blue-200 rounded-lg px-4 py-2">
+              <p className="text-sm text-blue-700">
+                Logged in as: <span className="font-semibold">{user.full_name || user.email}</span>
+              </p>
             </div>
-          ))}
+          )}
+        </div>
+        
+        <div className="mb-8">
+          <h3 className="text-2xl font-bold text-gray-800 mb-8 text-center">📚 Select Program to Teach</h3>
+          {programs.length === 0 ? (
+            <div className="text-center py-12">
+              <div className="text-gray-400 text-6xl mb-4">📚</div>
+              <h3 className="text-xl font-semibold text-gray-600 mb-2">No Programs Available</h3>
+              <p className="text-gray-500">There are currently no programs available for tutor assignment.</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              {programs.map((program) => (
+                <div
+                  key={program.id}
+                  className="group bg-white border-2 border-gray-200 rounded-2xl p-8 cursor-pointer hover:border-blue-300 hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1"
+                  onClick={() => handleProgramSelect(program)}
+                >
+                  <div className="flex items-center mb-4">
+                    <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center mr-4">
+                      <span className="text-2xl">📖</span>
+                    </div>
+                    <div>
+                      <h4 className="font-bold text-xl text-gray-800">{program.name}</h4>
+                      <p className="text-blue-600 font-medium">{program.program_code}</p>
+                    </div>
+                  </div>
+                  <p className="text-gray-600 leading-relaxed">{program.description}</p>
+                  <div className="mt-4 flex items-center text-sm text-gray-500">
+                    <span className="bg-gray-100 px-3 py-1 rounded-full">Click to select</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   const renderStep2 = () => (
     <div className="max-w-4xl mx-auto p-8">
@@ -356,42 +559,75 @@ const TutorRegister = () => {
       </div>
 
       <div className="space-y-4">
-        {selectedProgram?.classes.map((classItem) => (
-          <div
-            key={classItem.id}
-            className={`border-2 rounded-2xl p-6 cursor-pointer transition-all duration-300 ${
-              classItem.available
-                ? 'border-green-200 bg-green-50 hover:border-green-300 hover:bg-green-100 hover:shadow-lg'
-                : 'border-red-200 bg-red-50 cursor-not-allowed opacity-75'
-            }`}
-            onClick={() => handleClassSelect(classItem)}
-          >
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-4">
-                <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${
-                  classItem.available ? 'bg-green-100' : 'bg-red-100'
-                }`}>
-                  <span className="text-2xl">{classItem.available ? '✅' : '❌'}</span>
-                </div>
-                <div>
-                  <h4 className="font-bold text-xl text-gray-800">{classItem.class_code}</h4>
-                  <p className={`text-sm ${
-                    classItem.available ? 'text-green-600' : 'text-red-600'
+        {selectedProgram?.classes.map((classItem) => {
+          const isCurrentTutor = user && classItem.tutor_id === user.details.id;
+          const isSelectable = classItem.available || isCurrentTutor;
+          
+          return (
+            <div
+              key={classItem.id}
+              className={`border-2 rounded-2xl p-6 cursor-pointer transition-all duration-300 ${
+                isSelectable
+                  ? isCurrentTutor 
+                    ? 'border-blue-200 bg-blue-50 hover:border-blue-300 hover:bg-blue-100 hover:shadow-lg'
+                    : 'border-green-200 bg-green-50 hover:border-green-300 hover:bg-green-100 hover:shadow-lg'
+                  : 'border-red-200 bg-red-50 cursor-not-allowed opacity-75'
+              }`}
+              onClick={() => handleClassSelect(classItem)}
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-4">
+                  <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${
+                    isCurrentTutor ? 'bg-blue-100' : classItem.available ? 'bg-green-100' : 'bg-red-100'
                   }`}>
-                    {classItem.available ? 'Available for assignment' : `Taken by ${classItem.tutor_name}`}
-                  </p>
+                    <span className="text-2xl">
+                      {isCurrentTutor ? '👤' : classItem.available ? '✅' : '❌'}
+                    </span>
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-xl text-gray-800">{classItem.class_code}</h4>
+                    <p className={`text-sm ${
+                      isCurrentTutor 
+                        ? 'text-blue-600' 
+                        : classItem.available 
+                        ? 'text-green-600' 
+                        : 'text-red-600'
+                    }`}>
+                      {isCurrentTutor 
+                        ? `Your assigned class - Click to modify` 
+                        : classItem.available 
+                        ? 'Available for assignment' 
+                        : `Taken by ${classItem.tutor_name}`
+                      }
+                    </p>
+                    {isCurrentTutor && (
+                      <div className="mt-2">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (window.confirm(`Are you sure you want to unregister from class ${classItem.class_code}? This will remove all your schedules and make the class available for other tutors.`)) {
+                              handleUnregisterFromClass(classItem.id);
+                            }
+                          }}
+                          className="text-xs text-red-600 hover:text-red-800 bg-red-50 hover:bg-red-100 px-2 py-1 rounded transition-colors"
+                        >
+                          Unregister from this class
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 </div>
+                {isSelectable && (
+                  <div className={isCurrentTutor ? 'text-blue-600' : 'text-green-600'}>
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                    </svg>
+                  </div>
+                )}
               </div>
-              {classItem.available && (
-                <div className="text-green-600">
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                  </svg>
-                </div>
-              )}
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );
@@ -514,7 +750,20 @@ const TutorRegister = () => {
       <div className="p-6">
         {/* Header with week selection */}
         <div className="mb-6">
-          <h4 className="text-lg font-semibold text-gray-800 mb-4">Select Weeks to Teach</h4>
+          <div className="flex justify-between items-center mb-4">
+            <h4 className="text-lg font-semibold text-gray-800">Select Weeks to Teach</h4>
+            {selectedWeeks.length > 0 && (
+              <button
+                onClick={clearAllConfigurations}
+                className="flex items-center space-x-2 px-3 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors text-sm"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+                <span>Clear All</span>
+              </button>
+            )}
+          </div>
           <div className="flex flex-wrap gap-2">
             {availableWeeks.map((week) => (
               <button
@@ -548,20 +797,33 @@ const TutorRegister = () => {
                 
                 return (
                   <div key={week} className="border border-gray-200 rounded-xl overflow-hidden">
-                    {/* Week Header with Copy Button */}
+                    {/* Week Header with Copy and Clear Buttons */}
                     <div className="px-4 py-4 bg-blue-50 border-b border-blue-100 flex justify-between items-center">
                       <span className="text-lg font-bold text-blue-700 text-center flex-1">Week W{week}</span>
-                      {getWeekPeriodCount(week) > 0 && selectedWeeks.length > 1 && (
-                        <button
-                          onClick={() => copyConfigurationToOtherWeeks(week)}
-                          className="flex items-center space-x-1 text-xs text-blue-600 hover:text-blue-800 bg-blue-100 hover:bg-blue-200 px-2 py-1 rounded transition-colors"
-                        >
-                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                          </svg>
-                          <span>Copy to other weeks</span>
-                        </button>
-                      )}
+                      <div className="flex items-center space-x-2">
+                        {getWeekPeriodCount(week) > 0 && (
+                          <button
+                            onClick={() => clearWeekConfiguration(week)}
+                            className="flex items-center space-x-1 text-xs text-red-600 hover:text-red-800 bg-red-100 hover:bg-red-200 px-2 py-1 rounded transition-colors"
+                          >
+                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                            <span>Clear Week</span>
+                          </button>
+                        )}
+                        {getWeekPeriodCount(week) > 0 && selectedWeeks.length > 1 && (
+                          <button
+                            onClick={() => copyConfigurationToOtherWeeks(week)}
+                            className="flex items-center space-x-1 text-xs text-blue-600 hover:text-blue-800 bg-blue-100 hover:bg-blue-200 px-2 py-1 rounded transition-colors"
+                          >
+                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                            </svg>
+                            <span>Copy to other weeks</span>
+                          </button>
+                        )}
+                      </div>
                     </div>
 
                     {/* Per-week Table: first column = Period labels, remaining = days */}
@@ -607,7 +869,7 @@ const TutorRegister = () => {
                                   {isConfigured && slotConfig?.room && (
                                     <div className="absolute inset-0 flex items-center justify-center">
                                       <span className="text-xs text-green-700 font-medium truncate px-1">
-                                        {slotConfig.room.split(' ')[0]}
+                                        {slotConfig.room}
                                       </span>
                                     </div>
                                   )}
@@ -663,6 +925,8 @@ const TutorRegister = () => {
             <li>• Each week can only have one schedule (one day + one period)</li>
             <li>• Click the red × button to delete a configured schedule</li>
             <li>• Use "Copy to other weeks" to duplicate a complete schedule</li>
+            <li>• Use "Clear Week" to remove all configurations for a specific week</li>
+            <li>• Use "Clear All" to remove all week selections and configurations</li>
             <li>• Green slots show your selected room code</li>
           </ul>
         </div>
@@ -683,8 +947,31 @@ const TutorRegister = () => {
           <span>Back to Class Selection</span>
         </button>
         <div className="text-center">
-          <h2 className="text-3xl font-bold text-gray-800 mb-2">📅 Schedule Your Classes</h2>
-          <p className="text-gray-600">Class: <span className="font-semibold text-blue-600">{selectedClass?.class_code}</span></p>
+          <h2 className="text-3xl font-bold text-gray-800 mb-2">
+            {user && selectedClass?.tutor_id === user.details.id ? '📝 Modify Your Class Schedule' : '📅 Schedule Your Classes'}
+          </h2>
+          <p className="text-gray-600">
+            Class: <span className="font-semibold text-blue-600">{selectedClass?.class_code}</span>
+            {user && selectedClass?.tutor_id === user.details.id && (
+              <span className="ml-2 text-sm text-blue-600 bg-blue-50 px-2 py-1 rounded-full">
+                Your Assignment
+              </span>
+            )}
+          </p>
+          {user && selectedClass?.tutor_id === user.details.id && (
+            <div className="mt-4">
+              <button
+                onClick={handleUnregister}
+                disabled={loading}
+                className="flex items-center space-x-2 px-4 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors text-sm mx-auto"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+                <span>{loading ? 'Unregistering...' : 'Unregister from Class'}</span>
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
@@ -700,7 +987,7 @@ const TutorRegister = () => {
               <span className="text-2xl mr-3">⏱️</span>
               <span className="font-semibold text-gray-700">Periods per week</span>
             </div>
-            <span className="text-2xl font-bold text-blue-600">{selectedProgram?.period_of_week}</span>
+            <span className="text-2xl font-bold text-blue-600">{selectedProgram?.period_per_week}</span>
           </div>
           <div className="bg-white p-4 rounded-xl border border-blue-100 text-center">
             <div className="flex items-center justify-center mb-2">
@@ -734,16 +1021,26 @@ const TutorRegister = () => {
         <button
           onClick={handleSubmit}
           disabled={
+            loading ||
             !validateWeeks(selectedWeeks, selectedProgram) ||
             !selectedWeeks.every(week => weekConfigurations[week])
           }
           className="px-8 py-4 bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold rounded-2xl hover:from-blue-700 hover:to-indigo-700 disabled:from-gray-400 disabled:to-gray-500 disabled:cursor-not-allowed transition-all duration-300 transform hover:scale-105 shadow-lg"
         >
           <span className="flex items-center space-x-2">
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-            </svg>
-            <span>Complete Assignment</span>
+            {loading ? (
+              <>
+                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white"></div>
+                <span>{user && selectedClass?.tutor_id === user.details.id ? 'Updating Assignment...' : 'Saving Assignment...'}</span>
+              </>
+            ) : (
+              <>
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+                <span>{user && selectedClass?.tutor_id === user.details.id ? 'Update Assignment' : 'Complete Assignment'}</span>
+              </>
+            )}
           </span>
         </button>
       </div>
@@ -765,16 +1062,25 @@ const TutorRegister = () => {
               const day = parseInt(slotParts[1]);
               const period = parseInt(slotParts[2]);
               
-              // Check if this room is already taken by other schedules at this specific time slot
-              const isRoomTaken = takenSchedules.some(schedule => 
-                schedule.schedules.some(s => {
-                  const roomCode = room.split(' ')[0];
-                  return s.week === week && s.day === day && s.period === period && s.room.includes(roomCode);
-                })
-              );
+              // Check if this room is already taken by OTHER tutors at this specific time slot
+              const isRoomTaken = takenSchedules.some(schedule => {
+                return schedule.schedules.some(s => {
+                  // Check for exact match: week, day, period, and room must all match
+                  const isExactMatch = s.week === week && s.day === day && s.period === period && s.room === room;
+                  
+                  if (!isExactMatch) return false;
+                  
+                  // If it's an exact match, check if it's from the current tutor's class
+                  const isCurrentTutorClass = user && selectedClass && 
+                    schedule.class_code === selectedClass.class_code;
+                  
+                  // Only consider it a conflict if it's NOT from the current tutor's class
+                  return !isCurrentTutorClass;
+                });
+              });
               
               if (isRoomTaken) {
-                alert('This room is already taken by another tutor. Please select a different room.');
+                alert('This room is already taken by another tutor at this specific time slot. Please select a different room.');
                 return;
               }
               
@@ -788,6 +1094,12 @@ const TutorRegister = () => {
         }}
         selectedRoom={selectedRoom}
         takenSchedules={takenSchedules}
+        currentTimeSlot={currentConfiguringSlot ? {
+          week: parseInt(currentConfiguringSlot.split('-')[0]),
+          day: parseInt(currentConfiguringSlot.split('-')[1]),
+          period: parseInt(currentConfiguringSlot.split('-')[2])
+        } : null}
+        currentClassCode={selectedClass?.class_code}
       />
     </div>
   );
