@@ -312,33 +312,6 @@ const TutorRegister = () => {
     return true;
   };
 
-  const copyConfigurationToOtherWeeks = (sourceWeek) => {
-    const sourceConfig = weekConfigurations[sourceWeek];
-    if (!sourceConfig || !sourceConfig.periods) return;
-
-    const newConfigs = { ...weekConfigurations };
-    selectedWeeks.forEach(week => {
-      if (week !== sourceWeek) {
-        newConfigs[week] = { periods: [...sourceConfig.periods] };
-      }
-    });
-    setWeekConfigurations(newConfigs);
-  };
-
-  const clearWeekConfiguration = (week) => {
-    if (window.confirm(`Are you sure you want to clear all configurations for Week ${week}?`)) {
-      const newConfigs = { ...weekConfigurations };
-      delete newConfigs[week];
-      setWeekConfigurations(newConfigs);
-    }
-  };
-
-  const clearAllConfigurations = () => {
-    if (window.confirm('Are you sure you want to clear ALL week configurations? This action cannot be undone.')) {
-      setWeekConfigurations({});
-      setSelectedWeeks([]);
-    }
-  };
 
   const handleUnregister = async () => {
     if (!selectedClass || !user) return;
@@ -657,28 +630,15 @@ const TutorRegister = () => {
     
     return (
       <div key={week} className="bg-white border-2 border-gray-200 rounded-xl p-6 mb-6 shadow-lg hover:shadow-xl transition-shadow">
-        <div className="flex justify-between items-center mb-6">
-          <div className="flex items-center space-x-3">
-            <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
-              <span className="text-blue-600 font-semibold text-sm">W{week}</span>
-            </div>
-            <h4 className="text-lg font-semibold text-gray-800">Week {week} Configuration</h4>
-            {isFullyConfigured && (
-              <span className="px-3 py-1 bg-green-100 text-green-800 text-xs font-medium rounded-full">
-                ✓ Configured
-              </span>
-            )}
+        <div className="flex items-center space-x-3 mb-6">
+          <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+            <span className="text-blue-600 font-semibold text-sm">W{week}</span>
           </div>
-          {Object.keys(weekConfigurations).length > 1 && isFullyConfigured && (
-            <button
-              onClick={() => copyConfigurationToOtherWeeks(week)}
-              className="flex items-center space-x-2 text-sm text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 px-4 py-2 rounded-lg transition-colors"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-              </svg>
-              <span>Copy to other weeks</span>
-            </button>
+          <h4 className="text-lg font-semibold text-gray-800">Week {week} Configuration</h4>
+          {isFullyConfigured && (
+            <span className="px-3 py-1 bg-green-100 text-green-800 text-xs font-medium rounded-full">
+              ✓ Configured
+            </span>
           )}
         </div>
         
@@ -771,17 +731,6 @@ const TutorRegister = () => {
         <div className="mb-6">
           <div className="flex justify-between items-center mb-4">
             <h4 className="text-lg font-semibold text-gray-800">Select Weeks to Teach</h4>
-            {selectedWeeks.length > 0 && (
-              <button
-                onClick={clearAllConfigurations}
-                className="flex items-center space-x-2 px-3 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors text-sm"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                </svg>
-                <span>Clear All</span>
-              </button>
-            )}
           </div>
           <div className="flex flex-wrap gap-2">
             {availableWeeks.map((week) => (
@@ -816,33 +765,9 @@ const TutorRegister = () => {
                 
                 return (
                   <div key={week} className="border border-gray-200 rounded-xl overflow-hidden">
-                    {/* Week Header with Copy and Clear Buttons */}
+                    {/* Week Header */}
                     <div className="px-4 py-4 bg-blue-50 border-b border-blue-100 flex justify-between items-center">
                       <span className="text-lg font-bold text-blue-700 text-center flex-1">Week W{week}</span>
-                      <div className="flex items-center space-x-2">
-                        {getWeekPeriodCount(week) > 0 && (
-                          <button
-                            onClick={() => clearWeekConfiguration(week)}
-                            className="flex items-center space-x-1 text-xs text-red-600 hover:text-red-800 bg-red-100 hover:bg-red-200 px-2 py-1 rounded transition-colors"
-                          >
-                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                            </svg>
-                            <span>Clear Week</span>
-                          </button>
-                        )}
-                        {getWeekPeriodCount(week) > 0 && selectedWeeks.length > 1 && (
-                          <button
-                            onClick={() => copyConfigurationToOtherWeeks(week)}
-                            className="flex items-center space-x-1 text-xs text-blue-600 hover:text-blue-800 bg-blue-100 hover:bg-blue-200 px-2 py-1 rounded transition-colors"
-                          >
-                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                            </svg>
-                            <span>Copy to other weeks</span>
-                          </button>
-                        )}
-                      </div>
                     </div>
 
                     {/* Per-week Table: first column = Period labels, remaining = days */}
@@ -943,9 +868,6 @@ const TutorRegister = () => {
             <li>• Click any available slot to configure it</li>
             <li>• Each week can only have one schedule (one day + one period)</li>
             <li>• Click the red × button to delete a configured schedule</li>
-            <li>• Use "Copy to other weeks" to duplicate a complete schedule</li>
-            <li>• Use "Clear Week" to remove all configurations for a specific week</li>
-            <li>• Use "Clear All" to remove all week selections and configurations</li>
             <li>• Green slots show your selected room code</li>
           </ul>
         </div>
