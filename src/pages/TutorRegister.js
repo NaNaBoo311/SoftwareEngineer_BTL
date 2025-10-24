@@ -12,10 +12,8 @@ const TutorRegister = () => {
   const [selectedProgram, setSelectedProgram] = useState(null);
   const [selectedClass, setSelectedClass] = useState(null);
   const [selectedWeeks, setSelectedWeeks] = useState([]);
-  const [weekConfigurations, setWeekConfigurations] = useState({});
-  const [isOffline, setIsOffline] = useState(true); // Default to offline
+  const [sharedConfiguration, setSharedConfiguration] = useState({ periods: [] });
   const [showRoomModal, setShowRoomModal] = useState(false);
-  const [selectedRoom, setSelectedRoom] = useState('');
 
   // State for programs and taken schedules
   const [programs, setPrograms] = useState([]);
@@ -91,30 +89,22 @@ const TutorRegister = () => {
             );
             
             if (classSchedules && classSchedules.schedules) {
-              // Convert existing schedules to weekConfigurations format
-              const existingConfig = {};
-              
-              classSchedules.schedules.forEach(schedule => {
-                const week = schedule.week;
-                if (!existingConfig[week]) {
-                  existingConfig[week] = { periods: [] };
-                }
-                existingConfig[week].periods.push({
-                  day: schedule.day,
-                  period: schedule.period,
-                  room: schedule.room
-                });
-              });
-              
-              // Only set the configurations, don't trigger any updates
-              setWeekConfigurations(existingConfig);
-              
-              // Set selected weeks based on existing schedules
-              const weeks = Object.keys(existingConfig).map(Number).sort((a, b) => a - b);
+              // Extract unique weeks
+              const weeks = [...new Set(classSchedules.schedules.map(s => s.week))].sort((a, b) => a - b);
               setSelectedWeeks(weeks);
+              
+              // Load the shared configuration from the first week (since all weeks have the same config)
+              const firstWeekSchedules = classSchedules.schedules.filter(s => s.week === weeks[0]);
+              const sharedPeriods = firstWeekSchedules.map(schedule => ({
+                day: schedule.day,
+                period: schedule.period,
+                room: schedule.room
+              }));
+              
+              setSharedConfiguration({ periods: sharedPeriods });
             } else {
               // If no existing schedules, reset the configurations
-              setWeekConfigurations({});
+              setSharedConfiguration({ periods: [] });
               setSelectedWeeks([]);
             }
           } catch (err) {
@@ -125,7 +115,7 @@ const TutorRegister = () => {
         loadExistingSchedules();
       } else {
         // If not current tutor, reset configurations
-        setWeekConfigurations({});
+        setSharedConfiguration({ periods: [] });
         setSelectedWeeks([]);
       }
     }
@@ -141,15 +131,6 @@ const TutorRegister = () => {
     return weeks;
   };
 
-  // Validate period selection (must match program requirements)
-  const validatePeriods = (selectedPeriods, program) => {
-    if (!program || !selectedPeriods) return false;
-    
-    // Calculate total periods selected
-    const totalPeriods = selectedPeriods.reduce((sum, period) => sum + period.count, 0);
-    return totalPeriods === program.period_of_week;
-  };
-
   // Validate week selection (total must equal program.number_of_week)
   const validateWeeks = (selectedWeeks, program) => {
     if (!program || selectedWeeks.length !== program.number_of_week) {
@@ -158,30 +139,12 @@ const TutorRegister = () => {
     return true;
   };
 
-  // Check if a schedule slot is taken
-  const isScheduleTaken = (week, day, period, room) => {
-    return takenSchedules.some(schedule => 
-      schedule.schedules.some(s => 
-        s.week === week && s.day === day && s.period === period && s.room === room
-      )
-    );
-  };
-
-  // Get taken schedules for display
-  const getTakenSchedulesForDisplay = () => {
-    return takenSchedules.map(schedule => ({
-      ...schedule,
-      displayText: schedule.schedules.map(s => 
-        `Week ${s.week}, ${daysOfWeek.find(d => d.id === s.day)?.name}, ${periods.find(p => p.id === s.period)?.name}, ${s.room}`
-      ).join('; ')
-    }));
-  };
 
   const handleProgramSelect = (program) => {
     setSelectedProgram(program);
     setSelectedClass(null);
     setSelectedWeeks([]);
-    setWeekConfigurations({});
+    setSharedConfiguration({ periods: [] });
     setCurrentStep(2);
   };
 
@@ -199,10 +162,6 @@ const TutorRegister = () => {
   const handleWeekToggle = (week) => {
     if (selectedWeeks.includes(week)) {
       setSelectedWeeks(selectedWeeks.filter(w => w !== week));
-      // Remove configuration for this week
-      const newConfigs = { ...weekConfigurations };
-      delete newConfigs[week];
-      setWeekConfigurations(newConfigs);
     } else {
       if (selectedWeeks.length < selectedProgram.number_of_week) {
         setSelectedWeeks([...selectedWeeks, week]);
@@ -210,8 +169,8 @@ const TutorRegister = () => {
     }
   };
 
-  const handleWeekConfiguration = (week, day, period, room) => {
-    const currentConfig = weekConfigurations[week] || { periods: [] };
+  const handleSharedConfiguration = (day, period, room) => {
+    const currentConfig = sharedConfiguration;
     
     // Check if we're trying to add more periods than allowed
     if (currentConfig.periods.length >= selectedProgram?.period_per_week) {
@@ -222,26 +181,23 @@ const TutorRegister = () => {
     // Check if this specific slot is already configured
     const isSlotAlreadyConfigured = currentConfig.periods.some(p => p.day === day && p.period === period);
     if (isSlotAlreadyConfigured) {
-      alert('This time slot is already configured for this week.');
+      alert('This time slot is already configured.');
       return;
     }
     
     const newPeriods = [...currentConfig.periods, { day, period, room }];
     
-    setWeekConfigurations({
-      ...weekConfigurations,
-      [week]: { periods: newPeriods }
+    setSharedConfiguration({
+      periods: newPeriods
     });
   };
 
-  const handleSlotClick = (week, day, period) => {
-    const slotKey = `${week}-${day}-${period}`;
+  const handleSlotClick = (day, period) => {
+    const slotKey = `${day}-${period}`;
     setCurrentConfiguringSlot(slotKey);
-    setCurrentConfiguringWeek(week);
     
     // Check if this specific slot is already configured
-    const currentConfig = weekConfigurations[week];
-    const isSlotConfigured = currentConfig?.periods?.some(p => p.day === day && p.period === period);
+    const isSlotConfigured = sharedConfiguration?.periods?.some(p => p.day === day && p.period === period);
     
     if (isSlotConfigured) {
       setShowRoomModal(true);
@@ -252,64 +208,27 @@ const TutorRegister = () => {
     }
   };
 
-  const handleSlotDelete = (week, day, period) => {
-    const config = weekConfigurations[week];
+  const handleSlotDelete = (day, period) => {
+    const config = sharedConfiguration;
     if (config && config.periods) {
-      // Remove the specific period from this week
+      // Remove the specific period from the shared configuration
       const newPeriods = config.periods.filter(p => !(p.day === day && p.period === period));
       
-      if (newPeriods.length === 0) {
-        // If no periods left, remove the week configuration
-        const newConfigs = { ...weekConfigurations };
-        delete newConfigs[week];
-        setWeekConfigurations(newConfigs);
-      } else {
-        // Update with remaining periods
-        setWeekConfigurations({
-          ...weekConfigurations,
-          [week]: { periods: newPeriods }
-        });
-      }
+      setSharedConfiguration({
+        periods: newPeriods
+      });
     }
   };
 
-  const isSlotConfigured = (week, day, period) => {
-    const config = weekConfigurations[week];
-    return config && config.periods && config.periods.some(p => p.day === day && p.period === period);
+  const isSlotConfigured = (day, period) => {
+    return sharedConfiguration && sharedConfiguration.periods && sharedConfiguration.periods.some(p => p.day === day && p.period === period);
   };
 
-  const isSlotTaken = (week, day, period) => {
-    return takenSchedules.some(schedule => 
-      schedule.schedules.some(s => 
-        s.week === week && s.day === day && s.period === period
-      )
-    );
-  };
-
-  const isWeekFullyConfigured = (week) => {
-    const config = weekConfigurations[week];
-    if (!config || !config.periods) return false;
+  const isSharedConfigurationComplete = () => {
+    if (!sharedConfiguration || !sharedConfiguration.periods) return false;
     
-    // Check if this week has exactly the required number of periods
-    return config.periods.length === selectedProgram?.period_per_week;
-  };
-
-  const canSelectSlot = (week, day, period) => {
-    // Check if this specific slot is taken by others
-    return !isSlotTaken(week, day, period);
-  };
-
-  const getWeekPeriodCount = (week) => {
-    const config = weekConfigurations[week];
-    if (!config || !config.periods) return 0;
-    
-    // Count all selected periods for this week
-    return config.periods.length;
-  };
-
-  const canSelectSlotForWeek = (week, day, period) => {
-    // All slots can be selected - no slot conflicts
-    return true;
+    // Check if the shared configuration has exactly the required number of periods
+    return sharedConfiguration.periods.length === selectedProgram?.period_per_week;
   };
 
 
@@ -334,7 +253,7 @@ const TutorRegister = () => {
         // Reset form state
         setSelectedClass(null);
         setSelectedWeeks([]);
-        setWeekConfigurations({});
+        setSharedConfiguration({ periods: [] });
         setCurrentStep(1);
       } catch (error) {
         console.error('Unregister failed:', error);
@@ -361,27 +280,27 @@ const TutorRegister = () => {
     }
   };
 
-  const [currentConfiguringWeek, setCurrentConfiguringWeek] = useState(null);
   const [currentConfiguringSlot, setCurrentConfiguringSlot] = useState(null);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     
     if (!validateWeeks(selectedWeeks, selectedProgram)) {
-      alert('Please select the correct number of weeks with no consecutive weeks as required by the program.');
+      alert('Please select the correct number of weeks as required by the program.');
       return;
     }
 
-    // Check if all selected weeks have the correct number of periods
-    const allWeeksConfigured = selectedWeeks.every(week => {
-      const config = weekConfigurations[week];
-      return config && config.periods && config.periods.length === selectedProgram?.period_per_week;
-    });
-    
-    if (!allWeeksConfigured) {
-      alert(`Please configure all selected weeks with exactly ${selectedProgram?.period_per_week} period(s) each.`);
+    // Check if the shared configuration has the correct number of periods
+    if (!isSharedConfigurationComplete()) {
+      alert(`Please configure exactly ${selectedProgram?.period_per_week} period(s) for your schedule.`);
       return;
     }
+    
+    // Convert shared configuration to per-week configurations
+    const weekConfigurations = {};
+    selectedWeeks.forEach(week => {
+      weekConfigurations[week] = { periods: [...sharedConfiguration.periods] };
+    });
     try {
       setLoading(true);
       
@@ -410,7 +329,7 @@ const TutorRegister = () => {
       // Reset form state
       setSelectedClass(null);
       setSelectedWeeks([]);
-      setWeekConfigurations({});
+      setSharedConfiguration({ periods: [] });
       setCurrentStep(1);
       
     } catch (error) {
@@ -624,104 +543,6 @@ const TutorRegister = () => {
     </div>
   );
 
-  const renderWeekConfiguration = (week) => {
-    const config = weekConfigurations[week] || {};
-    const isFullyConfigured = config.day && config.period && config.room;
-    
-    return (
-      <div key={week} className="bg-white border-2 border-gray-200 rounded-xl p-6 mb-6 shadow-lg hover:shadow-xl transition-shadow">
-        <div className="flex items-center space-x-3 mb-6">
-          <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
-            <span className="text-blue-600 font-semibold text-sm">W{week}</span>
-          </div>
-          <h4 className="text-lg font-semibold text-gray-800">Week {week} Configuration</h4>
-          {isFullyConfigured && (
-            <span className="px-3 py-1 bg-green-100 text-green-800 text-xs font-medium rounded-full">
-              ✓ Configured
-            </span>
-          )}
-        </div>
-        
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {/* Day Selection */}
-          <div className="space-y-2">
-            <label className="block text-sm font-semibold text-gray-700 mb-3">📅 Day of Week</label>
-            <select
-              value={config.day || ''}
-              onChange={(e) => handleWeekConfiguration(week, { ...config, day: parseInt(e.target.value) })}
-              className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
-            >
-              <option value="">Choose a day</option>
-              {daysOfWeek.map((day) => {
-                const isTaken = isScheduleTaken(week, day.id, config.period, config.room);
-                return (
-                  <option key={day.id} value={day.id} disabled={isTaken}>
-                    {day.name} {isTaken ? '(Taken)' : ''}
-                  </option>
-                );
-              })}
-            </select>
-          </div>
-
-          {/* Period Selection */}
-          <div className="space-y-2">
-            <label className="block text-sm font-semibold text-gray-700 mb-3">⏰ Period</label>
-            <select
-              value={config.period || ''}
-              onChange={(e) => {
-                const periodId = parseInt(e.target.value);
-                const period = periods.find(p => p.id === periodId);
-                handleWeekConfiguration(week, { ...config, period: periodId, periodName: period?.name });
-              }}
-              className="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
-            >
-              <option value="">Choose a period</option>
-              {periods.map((period) => {
-                const isTaken = isScheduleTaken(week, config.day, period.id, config.room);
-                return (
-                  <option key={period.id} value={period.id} disabled={isTaken}>
-                    {period.name} {isTaken ? '(Taken)' : ''}
-                  </option>
-                );
-              })}
-            </select>
-          </div>
-
-          {/* Room Selection */}
-          <div className="space-y-2">
-            <label className="block text-sm font-semibold text-gray-700 mb-3">🏢 Room</label>
-            <button
-              onClick={() => {
-                setCurrentConfiguringWeek(week);
-                setShowRoomModal(true);
-              }}
-              className={`w-full px-4 py-3 border-2 rounded-lg text-left transition-colors ${
-                config.room 
-                  ? 'border-green-300 bg-green-50 text-green-800' 
-                  : 'border-gray-200 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
-              }`}
-            >
-              {config.room || 'Choose a room'}
-            </button>
-          </div>
-        </div>
-
-        {isFullyConfigured && (
-          <div className="mt-6 p-4 bg-gradient-to-r from-green-50 to-blue-50 border border-green-200 rounded-lg">
-            <div className="flex items-center space-x-2">
-              <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-              </svg>
-              <p className="text-sm font-medium text-gray-800">
-                <strong>Schedule:</strong> {daysOfWeek.find(d => d.id === config.day)?.name}, {config.periodName}, {config.room}
-              </p>
-            </div>
-          </div>
-        )}
-      </div>
-    );
-  };
-
   const renderCalendarSchedule = () => {
     const availableWeeks = getAvailableWeeks(selectedProgram);
     
@@ -755,92 +576,85 @@ const TutorRegister = () => {
           )}
         </div>
 
-        {/* Calendar Grid */}
+        {/* Single Shared Calendar */}
         {selectedWeeks.length > 0 && (
           <div className="overflow-x-auto">
-            <div className="min-w-full space-y-6">
-              {selectedWeeks.map((week) => {
-                const isFullyConfigured = isWeekFullyConfigured(week);
-                const config = weekConfigurations[week];
-                
-                return (
-                  <div key={week} className="border border-gray-200 rounded-xl overflow-hidden">
-                    {/* Week Header */}
-                    <div className="px-4 py-4 bg-blue-50 border-b border-blue-100 flex justify-between items-center">
-                      <span className="text-lg font-bold text-blue-700 text-center flex-1">Week W{week}</span>
+            <div className="border border-gray-200 rounded-xl overflow-hidden">
+              {/* Calendar Header */}
+              <div className="px-4 py-4 bg-blue-50 border-b border-blue-100">
+                <div className="text-center">
+                  <span className="text-lg font-bold text-blue-700">Configure Your Schedule</span>
+                  <p className="text-sm text-blue-600 mt-1">This schedule will apply to all selected weeks</p>
+                </div>
+              </div>
+
+              {/* Calendar Table */}
+              <div className="w-full">
+                {/* Header Row */}
+                <div className="grid" style={{ gridTemplateColumns: `200px repeat(${daysOfWeek.length}, minmax(120px, 1fr))` }}>
+                  <div className="p-3 bg-gray-50 border-r border-b border-gray-200 text-sm font-semibold text-gray-600">Period</div>
+                  {daysOfWeek.map((day) => (
+                    <div key={`hdr-${day.id}`} className="p-3 bg-gray-50 border-b border-gray-200 text-center text-sm font-semibold text-gray-600">
+                      {day.short}
                     </div>
+                  ))}
+                </div>
 
-                    {/* Per-week Table: first column = Period labels, remaining = days */}
-                    <div className="w-full">
-                      {/* Header Row */}
-                      <div className="grid" style={{ gridTemplateColumns: `200px repeat(${daysOfWeek.length}, minmax(120px, 1fr))` }}>
-                        <div className="p-3 bg-gray-50 border-r border-b border-gray-200 text-sm font-semibold text-gray-600">Period</div>
-                        {daysOfWeek.map((day) => (
-                          <div key={`hdr-${week}-${day.id}`} className="p-3 bg-gray-50 border-b border-gray-200 text-center text-sm font-semibold text-gray-600">
-                            {day.short}
-                          </div>
-                        ))}
-                      </div>
-
-                      {/* Period Rows */}
-                      {periods.map((period) => (
-                        <div key={`row-${week}-${period.id}`} className="grid" style={{ gridTemplateColumns: `200px repeat(${daysOfWeek.length}, minmax(120px, 1fr))` }}>
-                          {/* Period label (leftmost) */}
-                          <div className="p-3 border-r border-b border-gray-200 text-sm font-medium text-gray-700 flex items-center justify-center">
-                            {period.name}
-                          </div>
-                          {/* Day cells */}
-                          {daysOfWeek.map((day) => {
-                            const isConfigured = isSlotConfigured(week, day.id, period.id);
-                            const config = weekConfigurations[week];
-                            const slotConfig = config?.periods?.find(p => p.day === day.id && p.period === period.id);
-                            
-                            return (
-                              <div key={`cell-${week}-${day.id}-${period.id}`} className="relative h-12 border-b border-gray-200">
-                                <button
-                                  onClick={() => handleSlotClick(week, day.id, period.id)}
-                                  className={`h-full w-full ${
-                                    isConfigured
-                                      ? 'bg-green-100 border-2 border-green-400'
-                                      : 'bg-gray-50 hover:bg-blue-50 hover:border-blue-300'
-                                  }`}
-                                  title={
-                                    isConfigured 
-                                      ? `Configured: ${slotConfig?.room || 'No room'}` 
-                                      : 'Click to configure'
-                                  }
-                                >
-                                  {isConfigured && slotConfig?.room && (
-                                    <div className="absolute inset-0 flex items-center justify-center">
-                                      <span className="text-xs text-green-700 font-medium truncate px-1">
-                                        {slotConfig.room}
-                                      </span>
-                                    </div>
-                                  )}
-                                </button>
-                                
-                                {/* Delete button for configured slots */}
-                                {isConfigured && (
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleSlotDelete(week, day.id, period.id);
-                                    }}
-                                    className="absolute top-1 right-1 w-4 h-4 bg-red-500 text-white rounded-full flex items-center justify-center text-xs hover:bg-red-600 transition-colors"
-                                    title="Delete this schedule"
-                                  >
-                                    ×
-                                  </button>
-                                )}
+                {/* Period Rows */}
+                {periods.map((period) => (
+                  <div key={`row-${period.id}`} className="grid" style={{ gridTemplateColumns: `200px repeat(${daysOfWeek.length}, minmax(120px, 1fr))` }}>
+                    {/* Period label (leftmost) */}
+                    <div className="p-3 border-r border-b border-gray-200 text-sm font-medium text-gray-700 flex items-center justify-center">
+                      {period.name}
+                    </div>
+                    {/* Day cells */}
+                    {daysOfWeek.map((day) => {
+                      const isConfigured = isSlotConfigured(day.id, period.id);
+                      const slotConfig = sharedConfiguration?.periods?.find(p => p.day === day.id && p.period === period.id);
+                      
+                      return (
+                        <div key={`cell-${day.id}-${period.id}`} className="relative h-12 border-b border-gray-200">
+                          <button
+                            onClick={() => handleSlotClick(day.id, period.id)}
+                            className={`h-full w-full ${
+                              isConfigured
+                                ? 'bg-green-100 border-2 border-green-400'
+                                : 'bg-gray-50 hover:bg-blue-50 hover:border-blue-300'
+                            }`}
+                            title={
+                              isConfigured 
+                                ? `Configured: ${slotConfig?.room || 'No room'}` 
+                                : 'Click to configure'
+                            }
+                          >
+                            {isConfigured && slotConfig?.room && (
+                              <div className="absolute inset-0 flex items-center justify-center">
+                                <span className="text-xs text-green-700 font-medium truncate px-1">
+                                  {slotConfig.room}
+                                </span>
                               </div>
-                            );
-                          })}
+                            )}
+                          </button>
+                          
+                          {/* Delete button for configured slots */}
+                          {isConfigured && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleSlotDelete(day.id, period.id);
+                              }}
+                              className="absolute top-1 right-1 w-4 h-4 bg-red-500 text-white rounded-full flex items-center justify-center text-xs hover:bg-red-600 transition-colors"
+                              title="Delete this schedule"
+                            >
+                              ×
+                            </button>
+                          )}
                         </div>
-                      ))}
-                    </div>
+                      );
+                    })}
                   </div>
-                );
-              })}
+                ))}
+              </div>
             </div>
           </div>
         )}
@@ -855,19 +669,17 @@ const TutorRegister = () => {
             <div className="w-4 h-4 bg-gray-50 border border-gray-200 rounded"></div>
             <span>Available</span>
           </div>
-          <div className="flex items-center space-x-2">
-            <div className="w-4 h-4 bg-gray-100 border border-gray-300 rounded"></div>
-            <span>Week Already Configured</span>
-          </div>
         </div>
         
         {/* Instructions */}
         <div className="mt-4 p-4 bg-blue-50 rounded-lg">
           <h4 className="text-sm font-semibold text-blue-800 mb-2">Instructions:</h4>
           <ul className="text-xs text-blue-700 space-y-1">
-            <li>• Click any available slot to configure it</li>
-            <li>• Each week can only have one schedule (one day + one period)</li>
-            <li>• Click the red × button to delete a configured schedule</li>
+            <li>• First, select the weeks you want to teach from the buttons above</li>
+            <li>• Then, configure your schedule in the calendar below</li>
+            <li>• Click any slot to select a time and room</li>
+            <li>• The same schedule will automatically apply to ALL selected weeks</li>
+            <li>• Click the red × button to delete a configured slot</li>
             <li>• Green slots show your selected room code</li>
           </ul>
         </div>
@@ -964,7 +776,7 @@ const TutorRegister = () => {
           disabled={
             loading ||
             !validateWeeks(selectedWeeks, selectedProgram) ||
-            !selectedWeeks.every(week => weekConfigurations[week])
+            !isSharedConfigurationComplete()
           }
           className="px-8 py-4 bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold rounded-2xl hover:from-blue-700 hover:to-indigo-700 disabled:from-gray-400 disabled:to-gray-500 disabled:cursor-not-allowed transition-all duration-300 transform hover:scale-105 shadow-lg"
         >
@@ -991,54 +803,28 @@ const TutorRegister = () => {
         isOpen={showRoomModal}
         onClose={() => {
           setShowRoomModal(false);
-          setCurrentConfiguringWeek(null);
           setCurrentConfiguringSlot(null);
         }}
         onSelectRoom={(room) => {
-          if (currentConfiguringWeek) {
-            // Get the slot information from the current configuring slot
-            const slotParts = currentConfiguringSlot?.split('-');
-            if (slotParts && slotParts.length === 3) {
-              const week = parseInt(slotParts[0]);
-              const day = parseInt(slotParts[1]);
-              const period = parseInt(slotParts[2]);
-              
-              // Check if this room is already taken by OTHER tutors at this specific time slot
-              const isRoomTaken = takenSchedules.some(schedule => {
-                return schedule.schedules.some(s => {
-                  // Check for exact match: week, day, period, and room must all match
-                  const isExactMatch = s.week === week && s.day === day && s.period === period && s.room === room;
-                  
-                  if (!isExactMatch) return false;
-                  
-                  // If it's an exact match, check if it's from the current tutor's class
-                  const isCurrentTutorClass = user && selectedClass && 
-                    schedule.class_code === selectedClass.class_code;
-                  
-                  // Only consider it a conflict if it's NOT from the current tutor's class
-                  return !isCurrentTutorClass;
-                });
-              });
-              
-              if (isRoomTaken) {
-                alert('This room is already taken by another tutor at this specific time slot. Please select a different room.');
-                return;
-              }
-              
-              // Now configure the slot with the selected room
-              handleWeekConfiguration(week, day, period, room);
-            }
+          // Get the slot information from the current configuring slot
+          const slotParts = currentConfiguringSlot?.split('-');
+          if (slotParts && slotParts.length === 2) {
+            const day = parseInt(slotParts[0]);
+            const period = parseInt(slotParts[1]);
+            
+            // Configure the slot with the selected room
+            // (conflict checking is already done in the modal)
+            handleSharedConfiguration(day, period, room);
           }
           setShowRoomModal(false);
-          setCurrentConfiguringWeek(null);
           setCurrentConfiguringSlot(null);
         }}
-        selectedRoom={selectedRoom}
         takenSchedules={takenSchedules}
+        selectedWeeks={selectedWeeks}
         currentTimeSlot={currentConfiguringSlot ? {
-          week: parseInt(currentConfiguringSlot.split('-')[0]),
-          day: parseInt(currentConfiguringSlot.split('-')[1]),
-          period: parseInt(currentConfiguringSlot.split('-')[2])
+          week: null,
+          day: parseInt(currentConfiguringSlot.split('-')[0]),
+          period: parseInt(currentConfiguringSlot.split('-')[1])
         } : null}
         currentClassCode={selectedClass?.class_code}
       />

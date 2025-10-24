@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 
-const RoomSelectionModal = ({ isOpen, onClose, onSelectRoom, selectedRoom: initialRoom, takenSchedules = [], currentTimeSlot = null, currentClassCode = null }) => {
+const RoomSelectionModal = ({ isOpen, onClose, onSelectRoom, selectedRoom: initialRoom, takenSchedules = [], currentTimeSlot = null, currentClassCode = null, selectedWeeks = [] }) => {
   const [selectedBuilding, setSelectedBuilding] = useState('');
   const [selectedFloor, setSelectedFloor] = useState('');
   const [selectedRoom, setSelectedRoom] = useState('');
@@ -71,15 +71,17 @@ const RoomSelectionModal = ({ isOpen, onClose, onSelectRoom, selectedRoom: initi
     setSelectedRoom(room);
   };
 
-  // Check if a room is taken (check all schedules across all programs)
+  // Check if a room is taken across ALL selected weeks at the current time slot
   const isRoomTaken = (room) => {
     if (!takenSchedules || takenSchedules.length === 0) return false;
+    if (!currentTimeSlot || !selectedWeeks || selectedWeeks.length === 0) return false;
     
-    return takenSchedules.some(schedule => {
-      return schedule.schedules.some(s => {
-        // If we have currentTimeSlot, check for exact conflict at that specific time
-        if (currentTimeSlot) {
-          const isExactMatch = s.week === currentTimeSlot.week && 
+    // Check if this room is taken in ANY of the selected weeks at the current time slot
+    return selectedWeeks.some(week => {
+      return takenSchedules.some(schedule => {
+        return schedule.schedules.some(s => {
+          // Check for exact match: week, day, period, and room must all match
+          const isExactMatch = s.week === week && 
                  s.day === currentTimeSlot.day && 
                  s.period === currentTimeSlot.period && 
                  s.room === room;
@@ -92,16 +94,7 @@ const RoomSelectionModal = ({ isOpen, onClose, onSelectRoom, selectedRoom: initi
           
           // Only consider it a conflict if it's NOT from the current tutor's class
           return !isCurrentTutorClass;
-        }
-        
-        // If no currentTimeSlot, check if room is taken at any time slot
-        // but still exclude current tutor's class
-        const isCurrentTutorClass = currentClassCode && 
-          schedule.class_code === currentClassCode;
-        
-        if (isCurrentTutorClass) return false;
-        
-        return s.room === room;
+        });
       });
     });
   };
