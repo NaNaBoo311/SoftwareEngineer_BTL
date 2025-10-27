@@ -4,6 +4,7 @@ import { tutorService } from '../services/tutorService';
 import { programService } from '../services/programService';
 import RoomSelectionModal from '../components/RoomSelectionModal';
 import ProgramCard from '../components/ProgramCard';
+import ClassCard from '../components/ClassCard';
 import { useUser } from '../context/UserContext';
 
 const TutorRegister = () => {
@@ -21,6 +22,7 @@ const TutorRegister = () => {
   const [takenSchedules, setTakenSchedules] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [searchQuery, setSearchQuery] = useState('');
 
   // Available periods (individual periods, range 1-12)
   const periods = [
@@ -155,6 +157,18 @@ const TutorRegister = () => {
     setSharedConfiguration({ periods: [] });
     setCurrentStep(2);
   };
+
+  // Filter programs based on search query
+  const filteredPrograms = programs.filter(program => {
+    if (!searchQuery.trim()) return true;
+    
+    const query = searchQuery.toLowerCase();
+    return (
+      program.name?.toLowerCase().includes(query) ||
+      program.description?.toLowerCase().includes(query) ||
+      program.program_code?.toLowerCase().includes(query)
+    );
+  });
 
   const handleClassSelect = (classItem) => {
     console.log("Class Item", classItem);
@@ -410,8 +424,7 @@ const TutorRegister = () => {
     return (
       <div className="max-w-6xl mx-auto p-8">
         <div className="text-center mb-12">
-          <h1 className="text-4xl font-bold text-gray-800 mb-4">🎓 Tutor Class Assignment</h1>
-          <p className="text-lg text-gray-600">Choose a program and assign yourself to a class</p>
+          <h1 className="text-4xl font-bold text-gray-800 mb-4"> Tutor Class Assignment</h1>
           {user && (
             <div className="mt-4 inline-block bg-blue-50 border border-blue-200 rounded-lg px-4 py-2">
               <p className="text-sm text-blue-700">
@@ -422,16 +435,63 @@ const TutorRegister = () => {
         </div>
         
         <div className="mb-8">
-          <h3 className="text-2xl font-bold text-gray-800 mb-8 text-center">📚 Select Program to Teach</h3>
+          
+          {/* Search Bar */}
+          {programs.length > 0 && (
+            <div className="max-w-2xl mx-auto mb-8">
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                  <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
+                </div>
+                <input
+                  type="text"
+                  placeholder="Search programs by name or code."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full pl-12 pr-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all duration-200 text-gray-700 placeholder-gray-400"
+                />
+                {searchQuery && (
+                  <button
+                    onClick={() => setSearchQuery('')}
+                    className="absolute inset-y-0 right-0 pr-4 flex items-center text-gray-400 hover:text-gray-600"
+                  >
+                    <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                )}
+              </div>
+              {searchQuery && (
+                <p className="mt-2 text-sm text-gray-600 text-center">
+                  Found {filteredPrograms.length} program{filteredPrograms.length !== 1 ? 's' : ''}
+                </p>
+              )}
+            </div>
+          )}
+
           {programs.length === 0 ? (
             <div className="text-center py-12">
               <div className="text-gray-400 text-6xl mb-4">📚</div>
               <h3 className="text-xl font-semibold text-gray-600 mb-2">No Programs Available</h3>
               <p className="text-gray-500">There are currently no programs available for tutor assignment.</p>
             </div>
+          ) : filteredPrograms.length === 0 ? (
+            <div className="text-center py-12">
+              <div className="text-gray-400 text-6xl mb-4">🔍</div>
+              <h3 className="text-xl font-semibold text-gray-600 mb-2">No Programs Found</h3>
+              <p className="text-gray-500">No programs match your search criteria.</p>
+              <button
+                onClick={() => setSearchQuery('')}
+                className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                Clear Search
+              </button>
+            </div>
           ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                {programs.map((program) => (
+                {filteredPrograms.map((program) => (
                   <ProgramCard
                     key={program.id}
                     program={program}
@@ -458,81 +518,20 @@ const TutorRegister = () => {
           <span>Back to Program Selection</span>
         </button>
         <div className="text-center">
-          <h2 className="text-3xl font-bold text-gray-800 mb-2">🏫 Select Class for {selectedProgram?.name}</h2>
-          <p className="text-gray-600">Choose an available class to teach</p>
+          <h2 className="text-3xl font-bold text-gray-800 mb-2">Select Class for {selectedProgram?.name}</h2>
         </div>
       </div>
 
       <div className="space-y-4">
-        {selectedProgram?.classes.map((classItem) => {
-          const isCurrentTutor = user && classItem.tutor_id === user.details.id;
-          const isSelectable = classItem.available || isCurrentTutor;
-          
-          return (
-            <div
-              key={classItem.id}
-              className={`border-2 rounded-2xl p-6 cursor-pointer transition-all duration-300 ${
-                isSelectable
-                  ? isCurrentTutor 
-                    ? 'border-blue-200 bg-blue-50 hover:border-blue-300 hover:bg-blue-100 hover:shadow-lg'
-                    : 'border-green-200 bg-green-50 hover:border-green-300 hover:bg-green-100 hover:shadow-lg'
-                  : 'border-red-200 bg-red-50 cursor-not-allowed opacity-75'
-              }`}
-              onClick={() => handleClassSelect(classItem)}
-            >
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-4">
-                  <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${
-                    isCurrentTutor ? 'bg-blue-100' : classItem.available ? 'bg-green-100' : 'bg-red-100'
-                  }`}>
-                    <span className="text-2xl">
-                      {isCurrentTutor ? '👤' : classItem.available ? '✅' : '❌'}
-                    </span>
-                  </div>
-                  <div>
-                    <h4 className="font-bold text-xl text-gray-800">{classItem.class_code}</h4>
-                    <p className={`text-sm ${
-                      isCurrentTutor 
-                        ? 'text-blue-600' 
-                        : classItem.available 
-                        ? 'text-green-600' 
-                        : 'text-red-600'
-                    }`}>
-                      {isCurrentTutor 
-                        ? `Your assigned class - Click to modify` 
-                        : classItem.available 
-                        ? 'Available for assignment' 
-                        : `Taken by ${classItem.tutor_name}`
-                      }
-                    </p>
-                    {isCurrentTutor && (
-                      <div className="mt-2">
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            if (window.confirm(`Are you sure you want to unregister from class ${classItem.class_code}? This will remove all your schedules and make the class available for other tutors.`)) {
-                              handleUnregisterFromClass(classItem.id);
-                            }
-                          }}
-                          className="text-xs text-red-600 hover:text-red-800 bg-red-50 hover:bg-red-100 px-2 py-1 rounded transition-colors"
-                        >
-                          Unregister from this class
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                </div>
-                {isSelectable && (
-                  <div className={isCurrentTutor ? 'text-blue-600' : 'text-green-600'}>
-                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                    </svg>
-                  </div>
-                )}
-              </div>
-            </div>
-          );
-        })}
+        {selectedProgram?.classes.map((classItem) => (
+          <ClassCard
+            key={classItem.id}
+            classItem={classItem}
+            user={user}
+            onClassSelect={handleClassSelect}
+            onUnregister={handleUnregisterFromClass}
+          />
+        ))}
       </div>
     </div>
   );
