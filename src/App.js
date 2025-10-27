@@ -9,6 +9,7 @@ import FloatingMenu from "./components/FloatingMenu";
 import ApiPlayground from "./pages/ApiPlayGround";
 import ProtectedRoute from "./components/ProtectedRoute";
 import TutorRegister from "./pages/TutorRegister";
+import TutorSchedule from "./pages/TutorSchedule";
 import { UserProvider } from "./context/UserContext";
 
 export default function App() {
@@ -76,6 +77,16 @@ export default function App() {
               <Layout>
                 <TutorRegister />
               </Layout>
+            }
+          />
+          <Route
+            path="/tutor-schedule"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <TutorSchedule />
+                </Layout>
+              </ProtectedRoute>
             }
           />
         </Routes>

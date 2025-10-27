@@ -65,6 +65,44 @@ class TutorService {
     if (error) throw error;
     return data;
   }
+
+
+ async getTutorSchedules(tutorId) {
+    const { data, error } = await supabase
+      .from("schedules")
+      .select(`
+        id,
+        day,
+        period,
+        weeks,
+        room,
+        created_at,
+        class:class_id (
+          id,
+          class_code,
+          tutor_name,
+          program:program_id (
+            id,
+            program_code,
+            name,
+            start_week,
+            end_week,
+            number_of_week,
+            period_per_week
+          )
+        )
+      `)
+      .eq("class.tutor_id", tutorId);
+  
+    if (error) {
+      console.error("Error fetching tutor schedules:", error);
+      return [];
+    }
+  
+    return data;
+  }
+  
+
 }
 
 export const tutorService = new TutorService();

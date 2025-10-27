@@ -290,7 +290,6 @@ class StudentService {
           id: classData?.id,
           classCode: classData?.class_code,
           tutorName: classData?.tutor_name,
-          tutorDepartment: classData?.tutor_department,
           maxStudents: classData?.max_students,
           currentStudents: classData?.current_students,
         },

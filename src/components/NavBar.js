@@ -36,6 +36,9 @@ export default function Navbar() {
         <Link to="/support" className="hover:text-gray-300">
           Support
         </Link>
+        <Link to="/tutor-schedule" className="hover:text-gray-300">
+          Tutor Schedule
+        </Link>
       </div>
 
       {/* Right: Notifications, Messages, Avatar */}
