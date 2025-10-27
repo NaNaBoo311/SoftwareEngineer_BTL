@@ -94,20 +94,21 @@ class ProgramService {
           id,
           class_code,
           tutor_name,
-          tutor_department,
           max_students,
           current_students,
           schedules (
             id,
             day,
             period,
-            weeks
+            weeks,
+            room
           )
         )
       `)
       .eq("status", "active") // only active programs
       .order("id", { ascending: true });
   
+    console.log("Data", data);
     if (error) throw error;
   
     return data.map((program) => ({

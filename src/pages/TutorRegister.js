@@ -121,6 +121,13 @@ const TutorRegister = () => {
     }
   }, [selectedClass, user, takenSchedules]);
 
+  // Refetch data when entering step 3 to ensure schedules are up-to-date
+  useEffect(() => {
+    if (currentStep === 3) {
+      loadData();
+    }
+  }, [currentStep]);
+
   // Generate available weeks based on program constraints
   const getAvailableWeeks = (program) => {
     if (!program) return [];
