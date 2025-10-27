@@ -158,12 +158,12 @@ class ProgramService {
         period_per_week: program.period_per_week,
         number_of_week: program.number_of_week,
         start_week: program.start_week,
+        faculty: program.category,
         end_week: program.end_week,
         classes: relatedClasses,
       };
     });
   
-
     return formatted;
   }
   

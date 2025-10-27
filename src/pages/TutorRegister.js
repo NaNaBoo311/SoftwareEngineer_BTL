@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { tutorService } from '../services/tutorService';
 import { programService } from '../services/programService';
 import RoomSelectionModal from '../components/RoomSelectionModal';
+import ProgramCard from '../components/ProgramCard';
 import { useUser } from '../context/UserContext';
 
 const TutorRegister = () => {
@@ -429,29 +430,15 @@ const TutorRegister = () => {
               <p className="text-gray-500">There are currently no programs available for tutor assignment.</p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-              {programs.map((program) => (
-                <div
-                  key={program.id}
-                  className="group bg-white border-2 border-gray-200 rounded-2xl p-8 cursor-pointer hover:border-blue-300 hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1"
-                  onClick={() => handleProgramSelect(program)}
-                >
-                  <div className="flex items-center mb-4">
-                    <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center mr-4">
-                      <span className="text-2xl">📖</span>
-                    </div>
-                    <div>
-                      <h4 className="font-bold text-xl text-gray-800">{program.name}</h4>
-                      <p className="text-blue-600 font-medium">{program.program_code}</p>
-                    </div>
-                  </div>
-                  <p className="text-gray-600 leading-relaxed">{program.description}</p>
-                  <div className="mt-4 flex items-center text-sm text-gray-500">
-                    <span className="bg-gray-100 px-3 py-1 rounded-full">Click to select</span>
-                  </div>
-                </div>
-              ))}
-            </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                {programs.map((program) => (
+                  <ProgramCard
+                    key={program.id}
+                    program={program}
+                    onClick={handleProgramSelect}
+                  />
+                ))}
+              </div>
           )}
         </div>
       </div>

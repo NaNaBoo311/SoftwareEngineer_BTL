@@ -263,7 +263,6 @@ class StudentService {
           id,
           class_code,
           tutor_name,
-          tutor_department,
           max_students,
           current_students,
           programs (

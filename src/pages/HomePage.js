@@ -59,7 +59,6 @@ export default function HomePage() {
             class_id: enrollment.class?.id,
             class_code: enrollment.class?.classCode,
             tutor_name: enrollment.class?.tutorName,
-            tutor_department: enrollment.class?.tutorDepartment,
             enrolled_at: enrollment.enrolledAt
           }));
           
@@ -97,7 +96,6 @@ export default function HomePage() {
         class_id: enrollment.class?.id,
         class_code: enrollment.class?.classCode,
         tutor_name: enrollment.class?.tutorName,
-        tutor_department: enrollment.class?.tutorDepartment,
         enrolled_at: enrollment.enrolledAt
       }));
       

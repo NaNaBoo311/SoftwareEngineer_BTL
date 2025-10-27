@@ -3,7 +3,7 @@ import { Search, Users, User, ChevronDown, ChevronUp, X } from "lucide-react";
 import { programService } from "../services/programService";
 import { studentService } from "../services/studentService";
 import { useUser } from "../context/UserContext";
-
+import ConfirmRegistrationModal from "../components/ConfirmRegistrationModal";
 export default function StudentRegister() {
   const { user } = useUser();
   const [searchTerm, setSearchTerm] = useState("");
@@ -37,6 +37,7 @@ export default function StudentRegister() {
     
     try {
       const enrollments = await studentService.getStudentEnrollments(user.details.id);
+      console.log("enrollments",enrollments);
       setStudentEnrollments(enrollments);
     } catch (error) {
       console.error("Error fetching student enrollments:", error);
@@ -82,11 +83,6 @@ export default function StudentRegister() {
     setShowModal(true);
   };
 
-  const getScheduleSummary = (schedule) => {
-    const days = schedule.map((s) => s.day.slice(0, 3)).join(", ");
-    const period = schedule[0].period;
-    return `${days} Period ${period}`;
-  };
 
   // Helper function to convert day number to day name
   const getDayName = (dayNumber) => {
@@ -198,6 +194,11 @@ export default function StudentRegister() {
   const confirmRegistration = async () => {
     if (!user || !user.details?.id) {
       alert("You must be logged in to register for classes.");
+      return;
+    }
+
+    if (user.role !== "student") {
+      alert("You must be a student to register for classes.");
       return;
     }
 
@@ -567,76 +568,14 @@ export default function StudentRegister() {
         )}
       </div>
 
-      {showModal && selectedClass && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg max-w-md w-full p-6">
-            <h2 className="text-2xl font-bold text-gray-900 mb-4">
-              Confirm Registration
-            </h2>
-
-            <div className="mb-6">
-              <p className="text-gray-600 mb-4">
-                You are about to register for:
-              </p>
-              <div className="bg-gray-50 p-4 rounded-lg space-y-3">
-                <div>
-                  <p className="text-sm text-gray-500 mb-1">Program</p>
-                  <h3 className="font-semibold text-gray-900">
-                    {selectedClass.program.program_code} -{" "}
-                    {selectedClass.program.name}
-                  </h3>
-                </div>
-                <div className="border-t pt-3">
-                  <p className="text-sm text-gray-500 mb-1">Class</p>
-                  <p className="font-semibold text-gray-900">
-                    {selectedClass.class.class_code}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-500 mb-1">Tutor</p>
-                  <p className="font-medium text-gray-900">
-                    {selectedClass.class.tutor_name}
-                  </p>
-                  <p className="text-sm text-gray-600">
-                    {selectedClass.class.tutor_department}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-500 mb-1">Schedule</p>
-                  <p className="text-gray-900">
-                    {getScheduleSummary(selectedClass.class.schedule)}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-500 mb-1">Available Slots</p>
-                  <p className="text-gray-900">
-                    {selectedClass.class.max_students -
-                      selectedClass.class.current_students}{" "}
-                    slots remaining
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <div className="flex gap-3">
-              <button
-                onClick={() => setShowModal(false)}
-                disabled={registering}
-                className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={confirmRegistration}
-                disabled={registering}
-                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {registering ? "Registering..." : "Confirm"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+          <ConfirmRegistrationModal
+      isOpen={showModal}
+      onClose={() => setShowModal(false)}
+      selectedClass={selectedClass}
+      onConfirm={confirmRegistration}
+      isRegistering={registering}
+    />
+      
     </div>
   );
 }
