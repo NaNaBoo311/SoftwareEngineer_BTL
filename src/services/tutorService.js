@@ -6,7 +6,6 @@ class TutorService {
     email,
     password,
     tutorCode,
-    program,
     faculty,
     title
   ) {
@@ -26,18 +25,29 @@ class TutorService {
     const userId = signUpData.user?.id;
     if (!userId) throw new Error("User ID not returned from Supabase Auth.");
 
-    // Step 2: Insert into users + tutors tables
-    const { data, error } = await supabase.rpc("insert_tutor_profile", {
-      p_user_id: userId,
-      p_full_name: fullName,
-      p_email: email,
-      p_tutor_code: tutorCode,
-      p_program: program,
-      p_faculty: faculty,
-      p_title: title,
-    });
+    // Step 2: Insert into users table
+    const { error: userError } = await supabase
+      .from("users")
+      .insert({
+        id: userId,
+        full_name: fullName,
+        email: email,
+        role: "tutor",
+      });
 
-    if (error) throw error;
+    if (userError) throw userError;
+
+    // Step 3: Insert into tutors table
+    const { error: tutorError } = await supabase
+      .from("tutors")
+      .insert({
+        user_id: userId,
+        tutor_code: tutorCode,
+        faculty: faculty,
+        title: title,
+      });
+
+    if (tutorError) throw tutorError;
 
     return { userId };
   }

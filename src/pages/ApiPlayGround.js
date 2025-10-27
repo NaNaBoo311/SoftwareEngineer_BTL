@@ -16,13 +16,12 @@ export default function ApiPlayground() {
     Student: [
       {
         name: "insertStudent",
-        description: "1/ Register student account.\n2/ Insert student profile.",
+        description: "List of major:\n 1/ Computer Science\n 2/ Computer Engineering\n 3/ Automotive Engineering\n 4/ Aerospace Engineering\n 5/ Architecture\n 6/ Biotechnology\n 7/ Industrial Management (Minor: Business Administration / Operations & Supply Chain Management)\n 8/ Civil Engineering\n 9/ Chemical Engineering\n 10/ Electrical Electronics Engineering\n 11/ Environmental Engineering\n 12/ Food Technology\n 13/ Logistics & Supply Chain Management\n 14/ Advanced Materials Engineering\n 15/ Mechanical Engineering\n 16/ Mechatronics Engineering\n 17/ Mechatronics Engineering (Minor: Robot Engineering)\n 18/ Natural Resources & Environmental Management\n 19/ Petroleum Engineering\n 20/ Physics Engineering (Minor: Biomedical Engineering)",
         params: [
           "fullName",
           "email",
           "password",
           "studentCode",
-          "program",
           "major",
           "faculty",
         ],
@@ -32,7 +31,6 @@ export default function ApiPlayground() {
             params.email,
             params.password,
             params.studentCode,
-            params.program,
             params.major,
             params.faculty
           ),
@@ -45,10 +43,31 @@ export default function ApiPlayground() {
           await studentService.getStudentInfoByCode(params.studentCode),
       },
       {
-        name: "getAllStudent",
+        name: "getAllStudents",
         description: "Get all students available in the system",
         params: [],
-        handler: async () => await studentService.getAllStudent(),
+        handler: async () => await studentService.getAllStudents(),
+      },
+      {
+        name: "getStudentEnrollments",
+        description: "Fetch the detailed enrollments for a student",
+        params: ["studentId"],
+        handler: async (params) =>
+          await studentService.getStudentEnrollments(params.studentId),
+      },
+      {
+        name: "enrollStudentInClass",
+        description: "Enroll a student in a specific class",
+        params: ["studentId", "classId"],
+        handler: async (params) =>
+          await studentService.enrollStudentInClass(params.studentId, params.classId),
+      },
+      {
+        name: "unenrollStudentFromClass",
+        description: "Remove a student from a class",
+        params: ["studentId", "classId"],
+        handler: async (params) =>
+          await studentService.unenrollStudentFromClass(params.studentId, params.classId),
       },
     ],
     Tutor: [
@@ -61,7 +80,6 @@ export default function ApiPlayground() {
           "email",
           "password",
           "tutorCode",
-          "program",
           "faculty",
           "title",
         ],
@@ -71,7 +89,6 @@ export default function ApiPlayground() {
             params.email,
             params.password,
             params.tutorCode,
-            params.program,
             params.faculty,
             params.title
           ),
@@ -115,6 +132,12 @@ export default function ApiPlayground() {
         handler: async () => await authService.getUser(),
       },
       {
+        name: "getUserProfile",
+        description: "Get the current login user",
+        params: [],
+        handler: async () => await authService.getUserProfile(),
+      },
+      {
         name: "deleteUserAccount",
         description:
           "Delete the user account as well as tutor/student information.",
@@ -127,14 +150,17 @@ export default function ApiPlayground() {
       {
         name: "insertProgram",
         description: "Insert a program to the system.",
-        params: ["name", "code", "description", "faculty", "maxStudent"],
+        params: ["name", "code", "description", "faculty", "maxStudents", "numClasses", "periodPerWeek", "numberOfWeek"],
         handler: async (params) =>
           await programService.insertProgram(
             params.name,
             params.code,
-            (params.description = null),
+            params.description,
             params.faculty,
-            (params.maxStudents = 30)
+            params.maxStudents,
+            params.numClasses, 
+            params.periodPerWeek,
+            params.numberOfWeek,
           ),
       },
       {
@@ -150,11 +176,30 @@ export default function ApiPlayground() {
         handler: async (params) => programService.getProgramByCode(params.code),
       },
       {
+        name: "getProgramsForRegistration",
+        description: "Get all the program for registration",
+        params: [],
+        handler: async () => programService.getProgramsForRegistration(),
+      },
+      {
+        name: "getProgramsWithClasses",
+        description: "Get all the program with its classes",
+        params: [],
+        handler: async () => programService.getProgramsWithClasses(),
+      },
+      {
+        name: "getTakenSchedules",
+        description: "Get all the taken schedules",
+        params: [],
+        handler: async () => programService.getTakenSchedules(),
+      },
+      {
         name: "deleteProgram",
         description: "Delete the program by its code.",
         params: ["code"],
         handler: async (params) => programService.deleteProgram(params.code),
       },
+
     ],
   };
 
