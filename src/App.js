@@ -10,6 +10,7 @@ import ApiPlayground from "./pages/ApiPlayGround";
 import ProtectedRoute from "./components/ProtectedRoute";
 import TutorRegister from "./pages/TutorRegister";
 import TutorSchedule from "./pages/TutorSchedule";
+import TutorHomePage from "./pages/TutorHomePage";
 import { UserProvider } from "./context/UserContext";
 
 export default function App() {
@@ -20,11 +21,21 @@ export default function App() {
           <Route path="/" element={<Login />} />
 
           <Route
-            path="/home"
+            path="/student-home"
             element={
               <ProtectedRoute>
                 <Layout>
                   <StudentHomePage />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/tutor-home"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <TutorHomePage />
                 </Layout>
               </ProtectedRoute>
             }
