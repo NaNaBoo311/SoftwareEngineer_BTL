@@ -66,7 +66,6 @@ class TutorService {
     return data;
   }
 
-
  async getTutorSchedules(tutorId) {
     const { data, error } = await supabase
       .from("schedules")
@@ -102,6 +101,33 @@ class TutorService {
     return data;
   }
   
+ async getTutorEnrollments(tutorId) {
+  const { data, error } = await supabase
+    .from('classes')
+    .select(`
+      id,
+      class_code,
+      current_students,
+      max_students,
+      programs (
+        id,
+        program_code,
+        name,
+        status
+      )
+    `)
+    .eq('tutor_id', tutorId)
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    console.error('Error fetching tutor enrollments:', error);
+    throw error;
+  }
+
+  return data;
+}
+
+
 
 }
 

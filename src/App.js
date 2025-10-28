@@ -1,7 +1,7 @@
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import Layout from "./Layout";
 import Login from "./pages/Login";
-import HomePage from "./pages/HomePage";
+import StudentHomePage from "./pages/StudentHomePage";
 import ProfilePage from "./pages/ProfilePage";
 import StudentRegister from "./pages/StudentRegister";
 import CoursePage from "./pages/CoursePage";
@@ -24,7 +24,7 @@ export default function App() {
             element={
               <ProtectedRoute>
                 <Layout>
-                  <HomePage />
+                  <StudentHomePage />
                 </Layout>
               </ProtectedRoute>
             }

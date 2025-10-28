@@ -113,6 +113,12 @@ export default function ApiPlayground() {
         params: ["tutorId"],
         handler: async (params) => tutorService.getTutorSchedules(params.tutorId),
       },
+      {
+        name: "getTutorEnrollments",
+        description: "Get the enrollments for a tutor",
+        params: ["tutorId"],
+        handler: async (params) => tutorService.getTutorEnrollments(params.tutorId),
+      },
     ],
     Authentication: [
       {

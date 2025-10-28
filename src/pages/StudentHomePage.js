@@ -3,14 +3,13 @@ import { BookOpen, Loader2, RefreshCw } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useUser } from "../context/UserContext";
 import { studentService } from "../services/studentService";
-export default function HomePage() {
+
+export default function StudentHomePage() {
   const { user, loading: userLoading } = useUser();
   const [courses, setCourses] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [hasFetched, setHasFetched] = useState(false);
-  
 
-  // Fetch student's enrolled programs (only once per session)
+  // Fetch student's enrolled programs
   useEffect(() => {
     const fetchStudentPrograms = async () => {
       if (!user || !user.details?.id) {
@@ -25,60 +24,32 @@ export default function HomePage() {
         return;
       }
 
-      // Check if we already have cached data for this user
-      const cacheKey = `student_programs_${user.details.id}`;
-      const cachedData = localStorage.getItem(cacheKey);
-      const cacheTimestamp = localStorage.getItem(`${cacheKey}_timestamp`);
-      const now = Date.now();
-      const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes cache
-
-      // If we have cached data and it's not expired, use it
-      if (cachedData && cacheTimestamp && (now - parseInt(cacheTimestamp)) < CACHE_DURATION) {
-        try {
-          const programs = JSON.parse(cachedData);
-          setCourses(programs);
-          setLoading(false);
-          return;
-        } catch (error) {
-          console.error("Error parsing cached data:", error);
-          // Fall through to fetch fresh data
-        }
-      }
-
-      // Only fetch if we haven't fetched before or cache is expired
-      if (!hasFetched) {
-        try {
-          setLoading(true);
-          const enrollments = await studentService.getStudentEnrollments(user.details.id);
-          
-          // Transform enrollment data to match the expected format
-          const programs = enrollments.map(enrollment => ({
-            program_id: enrollment.program?.id,
-            program_code: enrollment.program?.programCode,
-            program_name: enrollment.program?.name,
-            class_id: enrollment.class?.id,
-            class_code: enrollment.class?.classCode,
-            tutor_name: enrollment.class?.tutorName,
-            enrolled_at: enrollment.enrolledAt
-          }));
-          
-          setCourses(programs);
-          setHasFetched(true);
-          
-          // Cache the data
-          localStorage.setItem(cacheKey, JSON.stringify(programs));
-          localStorage.setItem(`${cacheKey}_timestamp`, now.toString());
-        } catch (error) {
-          console.error("Error fetching student programs:", error);
-          setCourses([]);
-        } finally {
-          setLoading(false);
-        }
+      try {
+        setLoading(true);
+        const enrollments = await studentService.getStudentEnrollments(user.details.id);
+        
+        // Transform enrollment data to match the expected format
+        const programs = enrollments.map(enrollment => ({
+          program_id: enrollment.program?.id,
+          program_code: enrollment.program?.programCode,
+          program_name: enrollment.program?.name,
+          class_id: enrollment.class?.id,
+          class_code: enrollment.class?.classCode,
+          tutor_name: enrollment.class?.tutorName,
+          enrolled_at: enrollment.enrolledAt
+        }));
+        
+        setCourses(programs);
+      } catch (error) {
+        console.error("Error fetching student programs:", error);
+        setCourses([]);
+      } finally {
+        setLoading(false);
       }
     };
 
     fetchStudentPrograms();
-  }, [user, hasFetched]);
+  }, [user]);
 
   // Manual refresh function
   const handleRefresh = async () => {
@@ -100,18 +71,12 @@ export default function HomePage() {
       }));
       
       setCourses(programs);
-      
-      // Update cache
-      const cacheKey = `student_programs_${user.details.id}`;
-      localStorage.setItem(cacheKey, JSON.stringify(programs));
-      localStorage.setItem(`${cacheKey}_timestamp`, Date.now().toString());
     } catch (error) {
       console.error("Error refreshing student programs:", error);
     } finally {
       setLoading(false);
     }
   };
-
 
   return (
     <div className="min-h-screen bg-gray-50 px-6 py-8">
@@ -130,7 +95,7 @@ export default function HomePage() {
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-3xl font-bold text-gray-800">
-                Welcome back, {user?.full_name || user?.email || 'User'}! 👋
+                Welcome back, {user?.full_name || user?.email || 'User'}! 
               </h1>
               <p className="text-sm text-gray-500 mt-1">
                 Role: {user?.role || 'Unknown'} • {user?.role === 'student' ? 'Viewing your enrolled programs' : 'Dashboard'}
@@ -188,9 +153,6 @@ export default function HomePage() {
               <h3 className="text-gray-700 font-medium mb-2">{program.program_name}</h3>
               <p className="text-sm text-gray-500 mb-1">
                 <strong>Tutor:</strong> {program.tutor_name}
-              </p>
-              <p className="text-sm text-gray-500 mb-1">
-                <strong>Department:</strong> {program.tutor_department}
               </p>
               <p className="text-sm text-gray-500 mb-4">
                 <strong>Class:</strong> {program.class_code}

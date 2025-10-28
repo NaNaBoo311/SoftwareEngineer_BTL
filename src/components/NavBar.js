@@ -24,8 +24,11 @@ export default function Navbar() {
 
       {/* Center: Links */}
       <div className="flex space-x-6">
-        <Link to="/home" className="hover:text-gray-300">
-          Home
+        <Link to="/student-home" className="hover:text-gray-300">
+          StudentHome
+        </Link>
+          <Link to="/tutor-home" className="hover:text-gray-300">
+          TutorHome
         </Link>
         <Link to="/tutor-register" className="hover:text-gray-300">
           TutorRegister
