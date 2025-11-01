@@ -4,13 +4,12 @@ import Login from "./pages/Login";
 import HomePage from "./pages/HomePage";
 import ProfilePage from "./pages/ProfilePage";
 import StudentRegister from "./pages/StudentRegister";
-import CoursePage from "./pages/CoursePage";
 import ClassesPage from "./pages/ClassesPage";
-import Register from "./pages/Register";
 import FloatingMenu from "./components/FloatingMenu";
 import ApiPlayground from "./pages/ApiPlayGround";
 import ProtectedRoute from "./components/ProtectedRoute";
 import TutorRegister from "./pages/TutorRegister";
+import CourseSpecific from "./pages/CourseSpecific";
 import { UserProvider } from "./context/UserContext";
 
 export default function App() {
@@ -51,17 +50,16 @@ export default function App() {
             </ProtectedRoute>
           }
         />
-
-          <Route
-            path="/courses/:id"
-            element={
-              <ProtectedRoute>
-                <Layout>
-                  <CoursePage />
-                </Layout>
-              </ProtectedRoute>
-            }
-          />
+        <Route
+          path="/course/:courseId/:courseName/:tab"
+          element={
+            <ProtectedRoute>
+              <Layout>
+                <CourseSpecific />
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
         <Route
           path="/profile"
           element={
