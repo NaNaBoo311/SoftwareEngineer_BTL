@@ -97,9 +97,9 @@ export default function StudentHomePage() {
               <h1 className="text-3xl font-bold text-gray-800">
                 Welcome back, {user?.full_name || user?.email || 'User'}! 
               </h1>
-              <p className="text-sm text-gray-500 mt-1">
+              {/* <p className="text-sm text-gray-500 mt-1">
                 Role: {user?.role || 'Unknown'} • {user?.role === 'student' ? 'Viewing your enrolled programs' : 'Dashboard'}
-              </p>
+              </p> */}
             </div>
             {user?.role === 'student' && (
               <button
