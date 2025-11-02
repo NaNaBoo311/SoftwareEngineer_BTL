@@ -94,20 +94,21 @@ class ProgramService {
           id,
           class_code,
           tutor_name,
-          tutor_department,
           max_students,
           current_students,
           schedules (
             id,
             day,
             period,
-            weeks
+            weeks,
+            room
           )
         )
       `)
       .eq("status", "active") // only active programs
       .order("id", { ascending: true });
   
+    console.log("Data", data);
     if (error) throw error;
   
     return data.map((program) => ({
@@ -157,12 +158,12 @@ class ProgramService {
         period_per_week: program.period_per_week,
         number_of_week: program.number_of_week,
         start_week: program.start_week,
+        faculty: program.category,
         end_week: program.end_week,
         classes: relatedClasses,
       };
     });
   
-
     return formatted;
   }
   

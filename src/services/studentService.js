@@ -263,7 +263,6 @@ class StudentService {
           id,
           class_code,
           tutor_name,
-          tutor_department,
           max_students,
           current_students,
           programs (
@@ -291,7 +290,6 @@ class StudentService {
           id: classData?.id,
           classCode: classData?.class_code,
           tutorName: classData?.tutor_name,
-          tutorDepartment: classData?.tutor_department,
           maxStudents: classData?.max_students,
           currentStudents: classData?.current_students,
         },

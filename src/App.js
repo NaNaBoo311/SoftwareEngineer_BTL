@@ -1,7 +1,7 @@
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import Layout from "./Layout";
 import Login from "./pages/Login";
-import HomePage from "./pages/HomePage";
+import StudentHomePage from "./pages/StudentHomePage";
 import ProfilePage from "./pages/ProfilePage";
 import StudentRegister from "./pages/StudentRegister";
 import ClassesPage from "./pages/ClassesPage";
@@ -10,6 +10,8 @@ import ApiPlayground from "./pages/ApiPlayGround";
 import ProtectedRoute from "./components/ProtectedRoute";
 import TutorRegister from "./pages/TutorRegister";
 import CourseSpecific from "./pages/CourseSpecific";
+import TutorSchedule from "./pages/TutorSchedule";
+import TutorHomePage from "./pages/TutorHomePage";
 import { UserProvider } from "./context/UserContext";
 
 export default function App() {
@@ -20,11 +22,21 @@ export default function App() {
           <Route path="/" element={<Login />} />
 
           <Route
-            path="/home"
+            path="/student-home"
             element={
               <ProtectedRoute>
                 <Layout>
-                  <HomePage />
+                  <StudentHomePage />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/tutor-home"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <TutorHomePage />
                 </Layout>
               </ProtectedRoute>
             }
@@ -96,6 +108,16 @@ export default function App() {
               <Layout>
                 <TutorRegister />
               </Layout>
+            }
+          />
+          <Route
+            path="/tutor-schedule"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <TutorSchedule />
+                </Layout>
+              </ProtectedRoute>
             }
           />
         </Routes>

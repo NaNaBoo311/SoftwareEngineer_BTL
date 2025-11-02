@@ -3,7 +3,7 @@ import { Search, Users, User, ChevronDown, ChevronUp, X } from "lucide-react";
 import { programService } from "../services/programService";
 import { studentService } from "../services/studentService";
 import { useUser } from "../context/UserContext";
-
+import ConfirmRegistrationModal from "../components/ConfirmRegistrationModal";
 export default function StudentRegister() {
   const { user } = useUser();
   const [searchTerm, setSearchTerm] = useState("");
@@ -37,6 +37,7 @@ export default function StudentRegister() {
     
     try {
       const enrollments = await studentService.getStudentEnrollments(user.details.id);
+      console.log("enrollments",enrollments);
       setStudentEnrollments(enrollments);
     } catch (error) {
       console.error("Error fetching student enrollments:", error);
@@ -82,15 +83,122 @@ export default function StudentRegister() {
     setShowModal(true);
   };
 
-  const getScheduleSummary = (schedule) => {
-    const days = schedule.map((s) => s.day.slice(0, 3)).join(", ");
-    const period = schedule[0].period;
-    return `${days} Period ${period}`;
+
+  // Helper function to convert day number to day name
+  const getDayName = (dayNumber) => {
+    const dayNames = {
+      '1': 'Monday',
+      '2': 'Tuesday',
+      '3': 'Wednesday',
+      '4': 'Thursday',
+      '5': 'Friday',
+      '6': 'Saturday',
+      '7': 'Sunday'
+    };
+    return dayNames[dayNumber.toString()] || dayNumber;
+  };
+
+  // Helper function to format consecutive periods
+  const formatPeriods = (periods) => {
+    if (periods.length === 0) return '';
+    if (periods.length === 1) return periods[0].toString();
+
+    // Sort periods
+    const sorted = [...periods].sort((a, b) => a - b);
+    const ranges = [];
+    let start = sorted[0];
+    let end = sorted[0];
+
+    for (let i = 1; i < sorted.length; i++) {
+      if (sorted[i] === end + 1) {
+        // Consecutive period
+        end = sorted[i];
+      } else {
+        // Non-consecutive, save the range
+        if (start === end) {
+          ranges.push(start.toString());
+        } else {
+          ranges.push(`${start}-${end}`);
+        }
+        start = sorted[i];
+        end = sorted[i];
+      }
+    }
+
+    // Add the last range
+    if (start === end) {
+      ranges.push(start.toString());
+    } else {
+      ranges.push(`${start}-${end}`);
+    }
+
+    return ranges.join(', ');
+  };
+
+  // Helper function to group schedule by day
+  const groupScheduleByDay = (schedule) => {
+    // First, consolidate by day-period-room to merge weeks
+    const consolidatedMap = {};
+    
+    schedule.forEach(item => {
+      const key = `${item.day}-${item.period}-${item.room}`;
+      if (!consolidatedMap[key]) {
+        consolidatedMap[key] = {
+          day: item.day,
+          period: item.period,
+          room: item.room,
+          weeks: []
+        };
+      }
+      // Add week if not already present
+      if (!consolidatedMap[key].weeks.includes(item.weeks)) {
+        consolidatedMap[key].weeks.push(item.weeks);
+      }
+    });
+
+    // Now group by day only
+    const dayMap = {};
+    Object.values(consolidatedMap).forEach(item => {
+      const day = item.day;
+      if (!dayMap[day]) {
+        dayMap[day] = {
+          day: day,
+          periods: new Set(), // Use Set to avoid duplicates
+          room: null, // Will be set later
+          scheduledWeeks: item.weeks.map(w => parseInt(w))
+        };
+      }
+      
+      // Always try to set room if we have a valid one and haven't set it yet
+      if (item.room && item.room !== 'undefined' && !dayMap[day].room) {
+        dayMap[day].room = item.room;
+      }
+      
+      dayMap[day].periods.add(parseInt(item.period));
+      // Merge weeks from different periods
+      item.weeks.forEach(w => {
+        const weekNum = parseInt(w);
+        if (!dayMap[day].scheduledWeeks.includes(weekNum)) {
+          dayMap[day].scheduledWeeks.push(weekNum);
+        }
+      });
+    });
+
+    // Convert to array and format periods
+    return Object.values(dayMap).map(dayData => ({
+      ...dayData,
+      periodsFormatted: formatPeriods(Array.from(dayData.periods))
+    }));
   };
 
   const confirmRegistration = async () => {
     if (!user || !user.details?.id) {
       alert("You must be logged in to register for classes.");
+      return;
+    }
+
+    if (user.role !== "student") {
+      alert("You must be a student to register for classes.");
       return;
     }
 
@@ -226,12 +334,19 @@ export default function StudentRegister() {
           </div>
         ) : (
           <div className="space-y-4">
-            {filteredPrograms.map((program) => (
-              <div
-                key={program.id}
-                className="bg-white rounded-lg shadow-sm overflow-hidden"
-              >
-                <div className="p-6">
+            {filteredPrograms.map((program) => {
+              // Filter classes to only show those with tutors
+              const classesWithTutors = program.classes.filter(classItem => classItem.tutor_name && classItem.tutor_name.trim() !== '');
+              
+              // Skip programs with no classes that have tutors
+              if (classesWithTutors.length === 0) return null;
+              
+              return (
+                <div
+                  key={program.id}
+                  className="bg-white rounded-lg shadow-sm overflow-hidden"
+                >
+                  <div className="p-6">
                 <div className="flex items-start justify-between mb-3">
                   <div className="flex-1">
                     <h3 className="text-xl font-semibold text-gray-900 mb-1">
@@ -255,14 +370,14 @@ export default function StudentRegister() {
                     <div className="flex items-center">
                       <Users className="h-4 w-4 mr-2" />
                       <span>
-                        {getTotalEnrolled(program.classes)} students enrolled
+                        {getTotalEnrolled(classesWithTutors)} students enrolled
                       </span>
                     </div>
                     <div className="flex items-center">
                       <User className="h-4 w-4 mr-2" />
                       <span>
-                        {program.classes.length}{" "}
-                        {program.classes.length === 1 ? "class" : "classes"}{" "}
+                        {classesWithTutors.length}{" "}
+                        {classesWithTutors.length === 1 ? "class" : "classes"}{" "}
                         available
                       </span>
                     </div>
@@ -286,35 +401,50 @@ export default function StudentRegister() {
                 </div>
 
                 {expandedPrograms[program.id] && (
-                  <div className="border-t pt-4 space-y-3">
-                    {program.classes.map((classData) => (
+                  <div className="border-t pt-4 space-y-4">
+                    {classesWithTutors.map((classData) => (
                       <div
                         key={classData.id}
-                        className="p-4 bg-gray-50 rounded-lg"
+                        className="border-2 border-gray-200 rounded-xl overflow-hidden bg-white shadow-sm hover:shadow-md transition-shadow"
                       >
-                        <div className="flex items-center justify-between mb-4">
-                          <div className="flex-1">
-                            <div className="flex items-center gap-3 mb-2">
-                              <span className="font-semibold text-gray-900">
-                                {classData.class_code}
-                              </span>
-                              <span className="text-sm text-gray-500">|</span>
-                              <span className="text-gray-700">
-                                {classData.tutor_name}
-                              </span>
-                            </div>
-                            <div className="text-sm text-gray-600">
-                              <p>{classData.tutor_department}</p>
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-4">
-                            <div className="text-right">
-                              <div className="text-sm font-medium text-gray-900">
-                                {classData.current_students}/
-                                {classData.max_students}
+                        {/* Class Header */}
+                        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-5 border-b border-blue-100">
+                          <div className="flex items-start justify-between">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-3 mb-3">
+                                <div className="w-12 h-12 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-xl flex items-center justify-center shadow-md">
+                                  <User className="w-6 h-6 text-white" />
+                                </div>
+                                <div className="flex items-center gap-3">
+                                  <div className="px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-lg shadow-md">
+                                    <h4 className="text-2xl font-bold text-white">
+                                      {classData.class_code}
+                                    </h4>
+                                  </div>
+                                  {isAlreadyEnrolled(classData.id) && (
+                                    <span className="px-3 py-1 bg-green-100 text-green-700 text-sm font-semibold rounded-full border border-green-300">
+                                      ✓ Enrolled
+                                    </span>
+                                  )}
+                                </div>
                               </div>
-                              <div className="text-xs text-gray-500">
-                                students
+                              <div className="flex items-center gap-6 ml-14">
+                                <div className="flex items-center gap-3 bg-gradient-to-r from-purple-50 to-pink-50 px-4 py-2 rounded-lg border border-purple-200">
+                                  <span className="text-3xl">👨‍🏫</span>
+                                  <div>
+                                    <span className="text-purple-600 text-xs font-medium uppercase tracking-wide">Instructor</span>
+                                    <p className="font-bold text-gray-900 text-base">{classData.tutor_name}</p>
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-3 bg-gradient-to-r from-green-50 to-emerald-50 px-4 py-2 rounded-lg border border-green-200">
+                                  <span className="text-3xl">👥</span>
+                                  <div>
+                                    <span className="text-green-600 text-xs font-medium uppercase tracking-wide">Capacity</span>
+                                    <p className="font-bold text-gray-900 text-base">
+                                      {classData.current_students}/{classData.max_students} students
+                                    </p>
+                                  </div>
+                                </div>
                               </div>
                             </div>
                             <div className="flex gap-2">
@@ -322,87 +452,98 @@ export default function StudentRegister() {
                                 <button
                                   onClick={() => handleUnregister(classData.id)}
                                   disabled={unregistering[classData.id]}
-                                  className="flex items-center gap-1 px-4 py-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                                  className="flex items-center gap-2 px-6 py-3 text-base text-red-600 bg-white hover:bg-red-50 rounded-lg transition-all font-semibold disabled:opacity-50 disabled:cursor-not-allowed border-2 border-red-300 shadow-sm hover:shadow"
                                 >
-                                  <X className="w-4 h-4" />
+                                  <X className="w-5 h-5" />
                                   {unregistering[classData.id] ? "Unregistering..." : "Unregister"}
                                 </button>
                               ) : (
                                 <button
                                   onClick={() => handleRegister(program, classData)}
                                   disabled={!canRegister(program, classData)}
-                                  className={`px-6 py-2 rounded-lg font-medium transition-colors ${
+                                  className={`px-8 py-3 text-base rounded-lg font-semibold transition-all shadow-sm ${
                                     canRegister(program, classData)
-                                      ? "bg-blue-600 text-white hover:bg-blue-700"
-                                      : "bg-gray-300 text-gray-500 cursor-not-allowed"
+                                      ? "bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:from-blue-700 hover:to-indigo-700 hover:shadow-md"
+                                      : "bg-gray-200 text-gray-500 cursor-not-allowed"
                                   }`}
                                 >
                                   {isEnrolledInProgram(program.id)
                                     ? "Already in Program"
                                     : isFull(classData)
-                                    ? "Full"
+                                    ? "Class Full"
                                     : program.status === "completed"
                                     ? "Completed"
                                     : program.status === "upcoming"
                                     ? "Coming Soon"
-                                    : "Register"}
+                                    : "Register Now"}
                                 </button>
                               )}
                             </div>
                           </div>
                         </div>
 
-                        <div className="bg-white rounded-lg p-4 border border-gray-200">
-                          <h4 className="font-semibold text-gray-900 mb-3 text-sm">
-                            Class Schedule
-                          </h4>
-                          <div className="overflow-x-auto">
-                            <table className="w-full text-sm">
+                        {/* Schedule Details */}
+                        <div className="p-6 bg-gray-50">
+                          <div className="flex items-center gap-2 mb-5">
+                            <span className="text-2xl">📅</span>
+                            <h5 className="text-lg font-bold text-gray-800">Class Schedule</h5>
+                          </div>
+                          <div className="overflow-x-auto bg-white rounded-lg border border-gray-200">
+                            <table className="w-full">
                               <thead>
-                                <tr className="border-b border-gray-200">
-                                  <th className="text-left py-2 px-3 font-semibold text-gray-700">
-                                    Date
-                                  </th>
-                                  <th className="text-left py-2 px-3 font-semibold text-gray-700">
-                                    Period
-                                  </th>
-                                  <th className="text-left py-2 px-3 font-semibold text-gray-700">
-                                    Week
-                                  </th>
+                                <tr className="border-b-2 border-gray-200 bg-gradient-to-r from-gray-50 to-gray-100">
+                                  <th className="text-left py-4 px-5 font-bold text-gray-800 text-lg">Day</th>
+                                  <th className="text-left py-4 px-5 font-bold text-gray-800 text-lg">Periods</th>
+                                  <th className="text-left py-4 px-5 font-bold text-gray-800 text-lg">Room</th>
+                                  <th className="text-left py-4 px-5 font-bold text-gray-800 text-lg">Weeks</th>
                                 </tr>
                               </thead>
                               <tbody>
-                                {classData.schedule.map((scheduleItem, idx) => (
-                                  <tr
-                                    key={idx}
-                                    className="border-b border-gray-100 last:border-0"
-                                  >
-                                    <td className="py-3 px-3 text-gray-900">
-                                      {scheduleItem.day}
-                                    </td>
-                                    <td className="py-3 px-3 text-gray-700">
-                                      {scheduleItem.period}
-                                    </td>
-                                    <td className="py-3 px-3">
-                                      <div className="flex flex-wrap gap-1">
-                                        {scheduleItem.weeks
-                                          .split("|")
-                                          .map((week, weekIdx) => (
-                                            <span
-                                              key={weekIdx}
-                                              className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${
-                                                week === "-"
-                                                  ? "bg-gray-200 text-gray-600"
-                                                  : "bg-blue-100 text-blue-700"
-                                              }`}
-                                            >
-                                              {week === "-" ? "✕" : week}
-                                            </span>
-                                          ))}
-                                      </div>
-                                    </td>
-                                  </tr>
-                                ))}
+                                {groupScheduleByDay(classData.schedule).map((scheduleItem, idx) => {
+                                  // Generate weeks 35-50
+                                  const allWeeks = Array.from({ length: 16 }, (_, i) => i + 35);
+                                  const scheduledWeeks = scheduleItem.scheduledWeeks || [];
+                                  
+                                  return (
+                                    <tr
+                                      key={idx}
+                                      className="border-b border-gray-100 last:border-0 hover:bg-blue-50 transition-colors"
+                                    >
+                                      <td className="py-5 px-5 font-bold text-gray-900 text-base">
+                                        {getDayName(scheduleItem.day)}
+                                      </td>
+                                      <td className="py-5 px-5">
+                                        <span className="inline-block px-4 py-1.5 bg-blue-100 text-blue-700 rounded-full font-semibold text-sm">
+                                          {scheduleItem.periodsFormatted}
+                                        </span>
+                                      </td>
+                                      <td className="py-5 px-5">
+                                        <span className="inline-block min-w-[100px] px-4 py-2 bg-gradient-to-r from-purple-100 to-pink-100 text-purple-700 rounded-lg font-bold text-sm border border-purple-300 shadow-sm text-center">
+                                          {scheduleItem.room || 'TBA'}
+                                        </span>
+                                      </td>
+                                      <td className="py-5 px-5">
+                                        <div className="flex flex-wrap gap-2">
+                                          {allWeeks.map((week) => {
+                                            const isScheduled = scheduledWeeks.includes(week);
+                                            return (
+                                              <span
+                                                key={week}
+                                                className={`inline-block px-3 py-1.5 rounded-md text-sm font-bold shadow-sm ${
+                                                  isScheduled
+                                                    ? "bg-gradient-to-r from-green-100 to-emerald-100 text-green-700 border border-green-300"
+                                                    : "bg-gray-200 text-gray-500"
+                                                }`}
+                                              >
+                                                {week}
+                                              </span>
+                                            );
+                                          })}
+                                        </div>
+                                      </td>
+                                    </tr>
+                                  );
+                                })}
                               </tbody>
                             </table>
                           </div>
@@ -413,7 +554,8 @@ export default function StudentRegister() {
                 )}
               </div>
             </div>
-            ))}
+              );
+            })}
 
             {filteredPrograms.length === 0 && (
               <div className="text-center py-12">
@@ -426,76 +568,14 @@ export default function StudentRegister() {
         )}
       </div>
 
-      {showModal && selectedClass && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg max-w-md w-full p-6">
-            <h2 className="text-2xl font-bold text-gray-900 mb-4">
-              Confirm Registration
-            </h2>
-
-            <div className="mb-6">
-              <p className="text-gray-600 mb-4">
-                You are about to register for:
-              </p>
-              <div className="bg-gray-50 p-4 rounded-lg space-y-3">
-                <div>
-                  <p className="text-sm text-gray-500 mb-1">Program</p>
-                  <h3 className="font-semibold text-gray-900">
-                    {selectedClass.program.program_code} -{" "}
-                    {selectedClass.program.name}
-                  </h3>
-                </div>
-                <div className="border-t pt-3">
-                  <p className="text-sm text-gray-500 mb-1">Class</p>
-                  <p className="font-semibold text-gray-900">
-                    {selectedClass.class.class_code}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-500 mb-1">Tutor</p>
-                  <p className="font-medium text-gray-900">
-                    {selectedClass.class.tutor_name}
-                  </p>
-                  <p className="text-sm text-gray-600">
-                    {selectedClass.class.tutor_department}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-500 mb-1">Schedule</p>
-                  <p className="text-gray-900">
-                    {getScheduleSummary(selectedClass.class.schedule)}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-500 mb-1">Available Slots</p>
-                  <p className="text-gray-900">
-                    {selectedClass.class.max_students -
-                      selectedClass.class.current_students}{" "}
-                    slots remaining
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <div className="flex gap-3">
-              <button
-                onClick={() => setShowModal(false)}
-                disabled={registering}
-                className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={confirmRegistration}
-                disabled={registering}
-                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {registering ? "Registering..." : "Confirm"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+          <ConfirmRegistrationModal
+      isOpen={showModal}
+      onClose={() => setShowModal(false)}
+      selectedClass={selectedClass}
+      onConfirm={confirmRegistration}
+      isRegistering={registering}
+    />
+      
     </div>
   );
 }

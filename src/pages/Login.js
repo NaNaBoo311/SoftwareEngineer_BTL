@@ -13,7 +13,16 @@ export default function Login() {
 
     try {
       const data = await authService.signIn(fullEmail, password);
-      navigate("/home");
+      
+      // Get user profile to check role
+      const userProfile = await authService.getUserProfile();
+      
+      // Navigate based on user role
+      if (userProfile.role === "student") {
+        navigate("/student-home");
+      } else {
+        navigate("/tutor-home");
+      }
     } catch (error) {
       alert("Login failed: " + error.message);
     }
