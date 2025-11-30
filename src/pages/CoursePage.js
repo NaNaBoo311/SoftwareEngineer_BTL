@@ -16,7 +16,8 @@ export default function CoursePage() {
   // Use route state course if provided (HomePage passes it), otherwise mock
   const location = useLocation();
   const routeCourse = location?.state?.course;
-  const classItem = location?.state?.classItem;
+  const classItem = location?.state?.classItem; // From TutorHomePage
+  const program = location?.state?.program; // From StudentHomePage
 
   const defaultCourse = {
     id,
@@ -58,15 +59,30 @@ export default function CoursePage() {
     };
   }
 
+  // Build course object from program if available (from StudentHomePage)
+  let courseFromProgram = null;
+  if (program) {
+    const programCode = program.program_code || '';
+    const programName = program.program_name || '';
+    const classCode = program.class_code || '';
+
+    courseFromProgram = {
+      id: program.class_id,
+      title: `${programCode} - ${programName} (${classCode})`,
+      tags: `[${classCode}]`,
+      sections: defaultCourse.sections, // Use default sections for now
+    };
+  }
+
   const course = {
     ...defaultCourse,
-    ...(courseFromClassItem || routeCourse || {}),
+    ...(courseFromProgram || courseFromClassItem || routeCourse || {}),
     // ensure sections is always an array
     sections: Array.isArray(routeCourse?.sections)
       ? routeCourse.sections
-      : courseFromClassItem?.sections || defaultCourse.sections,
+      : courseFromProgram?.sections || courseFromClassItem?.sections || defaultCourse.sections,
     // prefer nicer title if passed
-    title: courseFromClassItem?.title || routeCourse?.title || routeCourse?.name || (routeCourse?.code ? `${routeCourse.code} - ${routeCourse.name || ''}` : defaultCourse.title),
+    title: courseFromProgram?.title || courseFromClassItem?.title || routeCourse?.title || routeCourse?.name || (routeCourse?.code ? `${routeCourse.code} - ${routeCourse.name || ''}` : defaultCourse.title),
   };
 
   return (
