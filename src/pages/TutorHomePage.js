@@ -42,7 +42,7 @@ export default function TutorHomePage() {
   // Manual refresh function
   const handleRefresh = async () => {
     if (!user || !user.details?.id || user.role !== "tutor") return;
-    
+
     try {
       setLoading(true);
       const enrollments = await tutorService.getTutorEnrollments(user.details.id);
@@ -71,7 +71,7 @@ export default function TutorHomePage() {
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-3xl font-bold text-gray-800">
-                Welcome back, {user?.full_name || user?.email || 'User'}! 
+                Welcome back, {user?.full_name || user?.email || 'User'}!
               </h1>
               {/* <p className="text-sm text-gray-500 mt-1">
                 Role: {user?.role || 'Unknown'} • {user?.role === 'tutor' ? 'Viewing your teaching classes' : 'Dashboard'}
@@ -129,11 +129,11 @@ export default function TutorHomePage() {
               <h3 className="text-gray-700 font-medium mb-2">
                 {classItem.programs?.name || 'Unnamed Program'}
               </h3>
-              
+
               <p className="text-sm text-gray-500 mb-1">
                 <strong>Class:</strong> {classItem.class_code}
               </p>
-              
+
               <div className="flex items-center gap-2 text-sm text-gray-500 mb-1">
                 <Users className="w-4 h-4" />
                 <span>
@@ -142,7 +142,7 @@ export default function TutorHomePage() {
               </div>
 
               <Link
-                to={`/classes/${classItem.id}`}
+                to={`/courses/${classItem.id}`}
                 state={{ classItem }}
                 className="inline-block mt-2 text-indigo-600 font-medium hover:underline text-sm"
               >

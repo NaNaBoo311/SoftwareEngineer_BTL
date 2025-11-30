@@ -1,11 +1,25 @@
 import { Link, useNavigate } from "react-router-dom";
 import { Bell, MessageSquare } from "lucide-react"; // icons
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { authService } from "../services/authService";
 
 export default function Navbar() {
   const navigate = useNavigate();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [userRole, setUserRole] = useState(null);
+
+  useEffect(() => {
+    const fetchUserProfile = async () => {
+      try {
+        const user = await authService.getUserProfile();
+        setUserRole(user.role);
+      } catch (error) {
+        console.error("Failed to fetch user profile:", error);
+      }
+    };
+    fetchUserProfile();
+  }, []);
+
   const handleExit = async () => {
     try {
       await authService.signOut(); //
@@ -14,6 +28,7 @@ export default function Navbar() {
       alert("Login failed: " + error.message);
     }
   };
+
   return (
     <nav className="bg-[#0388B4] text-white px-6 py-2 flex justify-between items-center shadow-md">
       {/* Left: Logo */}
@@ -24,24 +39,38 @@ export default function Navbar() {
 
       {/* Center: Links */}
       <div className="flex space-x-6">
-        <Link to="/student-home" className="hover:text-gray-300">
-          Home
-        </Link>
-          <Link to="/tutor-home" className="hover:text-gray-300">
-          TutorHome
-        </Link>
-        <Link to="/tutor-register" className="hover:text-gray-300">
-          TutorRegister
-        </Link>
-        <Link to="/student-register" className="hover:text-gray-300">
-          Register
-        </Link>
-        <Link to="/support" className="hover:text-gray-300">
-          Support
-        </Link>
-        <Link to="/tutor-schedule" className="hover:text-gray-300">
-          Tutor Schedule
-        </Link>
+        {/* Student Links - Always show for students */}
+        {userRole === "student" && (
+          <>
+            <Link to="/student-home" className="hover:text-gray-300">
+              Home
+            </Link>
+            <Link to="/student-register" className="hover:text-gray-300">
+              Register
+            </Link>
+            <Link to="/support" className="hover:text-gray-300">
+              Support
+            </Link>
+          </>
+        )}
+
+        {/* Tutor Links - Show for tutors */}
+        {userRole === "tutor" && (
+          <>
+            <Link to="/tutor-home" className="hover:text-gray-300">
+              Home
+            </Link>
+            <Link to="/tutor-register" className="hover:text-gray-300">
+              Register
+            </Link>
+            <Link to="/support" className="hover:text-gray-300">
+              Support
+            </Link>
+            <Link to="/tutor-schedule" className="hover:text-gray-300">
+              Tutor Schedule
+            </Link>
+          </>
+        )}
       </div>
 
       {/* Right: Notifications, Messages, Avatar */}
