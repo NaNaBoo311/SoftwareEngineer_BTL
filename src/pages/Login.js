@@ -80,7 +80,7 @@ export default function Login() {
               <button
                 type="button"
                 className="mt-2 text-xs text-blue-600 hover:underline self-start"
-                onClic
+                onClick={() => {}}
               >
                 Change Password?
               </button>
