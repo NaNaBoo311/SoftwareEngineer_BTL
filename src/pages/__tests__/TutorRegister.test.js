@@ -66,7 +66,7 @@ const basePrograms = [
     end_week: 3,
     number_of_week: 1,
     period_per_week: 1,
-    classes: [ { id: 'c3', class_code: 'BETA-01', tutor_id: null, available: true } ]
+    classes: [{ id: 'c3', class_code: 'BETA-01', tutor_id: null, available: true }]
   }
 ];
 
