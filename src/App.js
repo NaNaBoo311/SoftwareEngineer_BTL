@@ -4,11 +4,12 @@ import Login from "./pages/Login";
 import StudentHomePage from "./pages/StudentHomePage";
 import ProfilePage from "./pages/ProfilePage";
 import StudentRegister from "./pages/StudentRegister";
-import CoursePage from "./pages/CoursePage";
+import ClassesPage from "./pages/ClassesPage";
 import FloatingMenu from "./components/FloatingMenu";
 import ApiPlayground from "./pages/ApiPlayGround";
 import ProtectedRoute from "./components/ProtectedRoute";
 import TutorRegister from "./pages/TutorRegister";
+import CourseSpecific from "./pages/CourseSpecific";
 import TutorSchedule from "./pages/TutorSchedule";
 import TutorHomePage from "./pages/TutorHomePage";
 import { UserProvider } from "./context/UserContext";
@@ -51,17 +52,36 @@ export default function App() {
               </ProtectedRoute>
             }
           />
-
-          <Route
-            path="/courses/:id"
-            element={
-              <ProtectedRoute>
-                <Layout>
-                  <CoursePage />
-                </Layout>
-              </ProtectedRoute>
-            }
-          />
+        <Route
+          path="/classes"
+          element={
+            <ProtectedRoute>
+              <Layout>
+                <ClassesPage />
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/course/:courseId/:courseName/:tab"
+          element={
+            <ProtectedRoute>
+              <Layout>
+                <CourseSpecific />
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/profile"
+          element={
+            <ProtectedRoute>
+              <Layout>
+                <ProfilePage />
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
 
           <Route
             path="/student-register"
