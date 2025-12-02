@@ -5,13 +5,14 @@ import LearningResourcesModal from "../components/LearningResourcesModal";
 import CommunityForum from "../components/CommunityForum";
 import CourseRecord from "../components/CourseRecord";
 import CourseFeedback from "../components/CourseFeedback";
+import ScheduleEditor from "../components/ScheduleEditor";
 
 export default function CoursePage() {
   const { user } = useUser();
   const { id } = useParams();
   const [isResourcesModalOpen, setIsResourcesModalOpen] = useState(false);
   const [addedResources, setAddedResources] = useState([]);
-  const [activeTab, setActiveTab] = useState('course'); // 'course', 'record', 'community', or 'feedback'
+  const [activeTab, setActiveTab] = useState('course'); // 'course', 'record', 'community', 'feedback', or 'schedule'
 
   // Use route state course if provided (HomePage passes it), otherwise mock
   const location = useLocation();
@@ -140,6 +141,18 @@ export default function CoursePage() {
               Feedback
             </button>
           )}
+          {/* Show Schedule tab only for tutors */}
+          {user?.role === 'tutor' && (
+            <button
+              onClick={() => setActiveTab('schedule')}
+              className={`px-6 py-3 rounded-lg font-medium text-base transition-colors shadow-sm ${activeTab === 'schedule'
+                ? 'bg-blue-600 text-white hover:bg-blue-700'
+                : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-200'
+                }`}
+            >
+              Schedule
+            </button>
+          )}
         </div>
 
         {/* Tab Content */}
@@ -149,6 +162,8 @@ export default function CoursePage() {
           <CourseRecord courseTitle={course.title} classId={course.id} />
         ) : activeTab === 'feedback' ? (
           <CourseFeedback courseTitle={course.title} />
+        ) : activeTab === 'schedule' ? (
+          <ScheduleEditor classId={course.id} tutorId={user?.details?.id} />
         ) : (
           <>
             {/* Learning Resources Section */}
