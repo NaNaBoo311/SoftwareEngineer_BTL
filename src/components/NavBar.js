@@ -48,9 +48,9 @@ export default function Navbar() {
             <Link to="/student-register" className="hover:text-gray-300">
               Register
             </Link>
-            <Link to="/support" className="hover:text-gray-300">
+            {/* <Link to="/support" className="hover:text-gray-300">
               Support
-            </Link>
+            </Link> */}
           </>
         )}
 
@@ -63,12 +63,12 @@ export default function Navbar() {
             <Link to="/tutor-register" className="hover:text-gray-300">
               Register
             </Link>
-            <Link to="/support" className="hover:text-gray-300">
+            {/* <Link to="/support" className="hover:text-gray-300">
               Support
             </Link>
             <Link to="/tutor-schedule" className="hover:text-gray-300">
               Tutor Schedule
-            </Link>
+            </Link> */}
           </>
         )}
       </div>

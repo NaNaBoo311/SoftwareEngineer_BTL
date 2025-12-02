@@ -1,6 +1,8 @@
-# HCMUT Tutor Support System
+# Student Registration System
 
-A comprehensive web application for managing tutoring programs at Ho Chi Minh University of Technology (HCMUT). This system streamlines class registration, schedule management, and communication between students and tutors.
+**🌐 Live Demo:** [https://software-engineer-4k56p9o3e-namans-projects-06da7cc6.vercel.app](https://software-engineer-4k56p9o3e-namans-projects-06da7cc6.vercel.app)
+
+A comprehensive web application for managing student registrations, tutor schedules, and academic programs. Built with React and Supabase.
 
 ## 🚀 Getting Started
 
@@ -121,7 +123,7 @@ Use these credentials to explore the application:
 ## 🛠️ Technology Stack
 
 - **Frontend:** React 19.1.1
-- **Routing:** React Router DOM 7.8.2
+- **Routing:** React Router DOM 6.28.0
 - **Styling:** Tailwind CSS 3.4.17
 - **Backend:** Supabase (PostgreSQL database)
 - **Icons:** Lucide React
@@ -145,7 +147,7 @@ SoftwareEngineer_BTL/
 │   │   ├── StudentRegister.js
 │   │   ├── TutorRegister.js
 │   │   ├── CoursePage.js
-│   │   └── ...
+│   │   └── __tests__/   # Test files for pages
 │   ├── services/        # API and business logic
 │   │   ├── authService.js
 │   │   ├── classService.js
@@ -153,8 +155,7 @@ SoftwareEngineer_BTL/
 │   │   ├── programService.js
 │   │   └── ...
 │   └── lib/             # Utilities and configurations
-└── tests/               # Test files
-
+└── package.json         # Project dependencies and scripts
 ```
 
 ## 🔐 Security Features
@@ -178,11 +179,32 @@ SoftwareEngineer_BTL/
 ### `npm start`
 Runs the app in development mode at [http://localhost:3000](http://localhost:3000)
 
+The page will reload when you make changes. You may also see any lint errors in the console.
+
 ### `npm test`
-Launches the test runner in interactive watch mode
+Launches the test runner in interactive watch mode.
+
+**To run all tests:**
+```bash
+npm test
+```
+
+When the test runner starts, press `a` to run all tests.
+
+**Test Coverage:**
+- Component unit tests for `TutorRegister` and `StudentRegister`
+- Service layer tests
+- Integration tests for user workflows
+
+**Current Test Status:**
+- ✅ All 27 tests passing
+- ✅ Act warnings suppressed for async state updates
+- ✅ Custom modals properly tested
 
 ### `npm run build`
-Builds the app for production to the `build` folder
+Builds the app for production to the `build` folder.
+
+It correctly bundles React in production mode and optimizes the build for the best performance. The build is minified and the filenames include the hashes.
 
 ## 🗄️ Database Schema
 
@@ -195,23 +217,9 @@ The application uses Supabase with the following main tables:
 - `schedules` - Class schedules and room assignments
 - `student_classes` - Student enrollment records
 
-## 🤝 Contributing
-
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
-
 ## 📄 License
 
 This project is developed for educational purposes at HCMUT.
-
-## 📧 Contact
-
-For technical support or inquiries:
-- Email: an.pham3101@hcmut.edu.vn
-- Tel: (+84) 123 456 789
 
 ---
 

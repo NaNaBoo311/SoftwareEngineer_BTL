@@ -134,7 +134,7 @@ export default function App() {
         </Routes>
 
         {/* Always visible */}
-        <FloatingMenu />
+        {/* <FloatingMenu /> */}
       </Router>
     </UserProvider>
   );
