@@ -4,6 +4,9 @@ import { programService } from "../services/programService";
 import { studentService } from "../services/studentService";
 import { useUser } from "../context/UserContext";
 import ConfirmRegistrationModal from "../components/ConfirmRegistrationModal";
+import NotificationModal from "../components/NotificationModal";
+import ConfirmationModal from "../components/ConfirmationModal";
+
 export default function StudentRegister() {
   const { user } = useUser();
   const [searchTerm, setSearchTerm] = useState("");
@@ -16,6 +19,61 @@ export default function StudentRegister() {
   const [registering, setRegistering] = useState(false);
   const [studentEnrollments, setStudentEnrollments] = useState([]);
   const [unregistering, setUnregistering] = useState({});
+
+  // Notification state
+  const [notification, setNotification] = useState({
+    isOpen: false,
+    title: '',
+    message: '',
+    type: 'info'
+  });
+
+  // Helper function to show notifications
+  const showNotification = (message, type = 'info', title = '') => {
+    setNotification({
+      isOpen: true,
+      title,
+      message,
+      type
+    });
+  };
+
+  const closeNotification = () => {
+    setNotification(prev => ({ ...prev, isOpen: false }));
+  };
+
+  // Confirmation state
+  const [confirmation, setConfirmation] = useState({
+    isOpen: false,
+    title: '',
+    message: '',
+    onConfirm: null,
+    confirmText: 'Confirm',
+    confirmButtonClass: 'bg-blue-600 hover:bg-blue-700'
+  });
+
+  // Helper function to show confirmation
+  const showConfirmation = (message, onConfirm, title = 'Confirm Action', confirmText = 'Confirm', confirmButtonClass = 'bg-blue-600 hover:bg-blue-700') => {
+    setConfirmation({
+      isOpen: true,
+      title,
+      message,
+      onConfirm,
+      confirmText,
+      confirmButtonClass
+    });
+  };
+
+  const closeConfirmation = () => {
+    setConfirmation(prev => ({ ...prev, isOpen: false, onConfirm: null }));
+  };
+
+  const handleConfirmAction = () => {
+    if (confirmation.onConfirm) {
+      confirmation.onConfirm();
+    }
+    closeConfirmation();
+  };
 
   // Fetch programs for registration
   const fetchPrograms = async () => {
@@ -34,10 +92,10 @@ export default function StudentRegister() {
   // Fetch student enrollments to check if already enrolled
   const fetchStudentEnrollments = async () => {
     if (!user || !user.details?.id || user.role !== "student") return;
-    
+
     try {
       const enrollments = await studentService.getStudentEnrollments(user.details.id);
-      console.log("enrollments",enrollments);
+      console.log("enrollments", enrollments);
       setStudentEnrollments(enrollments);
     } catch (error) {
       console.error("Error fetching student enrollments:", error);
@@ -50,7 +108,7 @@ export default function StudentRegister() {
   }, [user]);
 
 
-  
+
   const categories = ["all", "Academic", "Non-Academic"];
   const filteredPrograms = programs.filter((program) => {
     const matchesSearch =
@@ -139,7 +197,7 @@ export default function StudentRegister() {
   const groupScheduleByDay = (schedule) => {
     // First, consolidate by day-period-room to merge weeks
     const consolidatedMap = {};
-    
+
     schedule.forEach(item => {
       const key = `${item.day}-${item.period}-${item.room}`;
       if (!consolidatedMap[key]) {
@@ -168,12 +226,12 @@ export default function StudentRegister() {
           scheduledWeeks: item.weeks.map(w => parseInt(w))
         };
       }
-      
+
       // Always try to set room if we have a valid one and haven't set it yet
       if (item.room && item.room !== 'undefined' && !dayMap[day].room) {
         dayMap[day].room = item.room;
       }
-      
+
       dayMap[day].periods.add(parseInt(item.period));
       // Merge weeks from different periods
       item.weeks.forEach(w => {
@@ -193,85 +251,168 @@ export default function StudentRegister() {
 
   const confirmRegistration = async () => {
     if (!user || !user.details?.id) {
-      alert("You must be logged in to register for classes.");
+      showNotification("You must be logged in to register for classes.", "warning", "Login Required");
       return;
     }
 
     if (user.role !== "student") {
-      alert("You must be a student to register for classes.");
+      showNotification("You must be a student to register for classes.", "warning", "Access Denied");
       return;
     }
 
     try {
       setRegistering(true);
-      
+
       // Enroll the student in the class
       const result = await studentService.enrollStudentInClass(
         user.details.id, // studentId
         selectedClass.class.id // classId
       );
 
-      alert(
-        `Successfully registered for ${selectedClass.class.class_code} with ${selectedClass.class.tutor_name}!`
+      showNotification(
+        `Successfully registered for ${selectedClass.class.class_code} with ${selectedClass.class.tutor_name}!`,
+        "success",
+        "Registration Successful"
       );
-      
+
       // Clear the modal and selected class
       setShowModal(false);
       setSelectedClass(null);
-      
+
       // Refresh the programs list and student enrollments
       await fetchPrograms();
       await fetchStudentEnrollments();
-      
+
     } catch (error) {
       console.error("Registration error:", error);
-      alert(`Registration failed: ${error.message}`);
+      showNotification(`Registration failed: ${error.message}`, "error", "Registration Failed");
     } finally {
       setRegistering(false);
     }
   };
 
-  // Unregister from a class
   const handleUnregister = async (classId) => {
     if (!user || !user.details?.id) {
-      alert("You must be logged in to unregister from classes.");
+      showNotification("You must be logged in to unregister from classes.", "warning", "Login Required");
       return;
     }
 
-    if (!window.confirm("Are you sure you want to unregister from this class?")) {
+    // Show confirmation modal
+    showConfirmation(
+      "Are you sure you want to unregister from this class?",
+      async () => {
+        try {
+          setUnregistering(prev => ({ ...prev, [classId]: true }));
+
+          await studentService.unenrollStudentFromClass(user.details.id, classId);
+
+          showNotification("Successfully unregistered from the class!", "success", "Unregistration Successful");
+
+          // Refresh the programs list and student enrollments
+          await fetchPrograms();
+          await fetchStudentEnrollments();
+
+        } catch (error) {
+          console.error("Unregistration error:", error);
+          showNotification(`Unregistration failed: ${error.message}`, "error", "Unregistration Failed");
+        } finally {
+          setUnregistering(prev => ({ ...prev, [classId]: false }));
+        }
+      },
+      "Confirm Unregistration",
+      "Unregister",
+      "bg-red-600 hover:bg-red-700"
+    );
+  };
+
+  // Auto Match - randomly select an available class and enroll
+  const handleAutoMatch = async (program) => {
+    if (!user || !user.details?.id) {
+      showNotification("You must be logged in to use Auto Match.", "warning", "Login Required");
       return;
     }
 
-    try {
-      setUnregistering(prev => ({ ...prev, [classId]: true }));
-      
-      await studentService.unenrollStudentFromClass(user.details.id, classId);
-      
-      alert("Successfully unregistered from the class!");
-      
-      // Refresh the programs list and student enrollments
-      await fetchPrograms();
-      await fetchStudentEnrollments();
-      
-    } catch (error) {
-      console.error("Unregistration error:", error);
-      alert(`Unregistration failed: ${error.message}`);
-    } finally {
-      setUnregistering(prev => ({ ...prev, [classId]: false }));
+    if (user.role !== "student") {
+      showNotification("You must be a student to use Auto Match.", "warning", "Access Denied");
+      return;
     }
+
+    // Check if already enrolled in this program
+    if (isEnrolledInProgram(program.id)) {
+      showNotification("You are already enrolled in a class for this program.", "info", "Already Enrolled");
+      return;
+    }
+
+    // Filter classes with tutors
+    const classesWithTutors = program.classes.filter(
+      classItem => classItem.tutor_name && classItem.tutor_name.trim() !== ''
+    );
+
+    // Filter available classes (not full, not already enrolled)
+    const availableClasses = classesWithTutors.filter(classData =>
+      canRegister(program, classData)
+    );
+
+    if (availableClasses.length === 0) {
+      showNotification(
+        "No available classes found for this program. All classes are either full or you're already enrolled.",
+        "warning",
+        "No Available Classes"
+      );
+      return;
+    }
+
+    // Randomly select a class
+    const randomIndex = Math.floor(Math.random() * availableClasses.length);
+    const selectedClass = availableClasses[randomIndex];
+
+    // Show confirmation modal
+    showConfirmation(
+      `Auto Match found:\n\nClass: ${selectedClass.class_code}\nInstructor: ${selectedClass.tutor_name}\n\nDo you want to enroll in this class?`,
+      async () => {
+        try {
+          setRegistering(true);
+
+          // Enroll the student in the randomly selected class
+          await studentService.enrollStudentInClass(
+            user.details.id,
+            selectedClass.id
+          );
+
+          showNotification(
+            `Successfully enrolled in ${selectedClass.class_code} with ${selectedClass.tutor_name}!`,
+            "success",
+            "Auto Match Successful"
+          );
+
+          // Refresh the programs list and student enrollments
+          await fetchPrograms();
+          await fetchStudentEnrollments();
+
+        } catch (error) {
+          console.error("Auto Match error:", error);
+          showNotification(`Auto Match failed: ${error.message}`, "error", "Auto Match Failed");
+        } finally {
+          setRegistering(false);
+        }
+      },
+      "Confirm Auto Match",
+      "Enroll Now",
+      "bg-green-600 hover:bg-green-700"
+    );
   };
 
   const isFull = (classData) =>
     classData.current_students >= classData.max_students;
-  
+
   const isAlreadyEnrolled = (classId) => {
     return studentEnrollments.some(enrollment => enrollment.class?.id === classId);
   };
-  
+
   const isEnrolledInProgram = (programId) => {
     return studentEnrollments.some(enrollment => enrollment.program?.id === programId);
   };
-  
+
   const canRegister = (program, classData) => {
     if (program.status !== "active") return false;
     if (isFull(classData)) return false;
@@ -314,11 +455,10 @@ export default function StudentRegister() {
                 <button
                   key={category}
                   onClick={() => setSelectedCategory(category)}
-                  className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                    selectedCategory === category
-                      ? "bg-blue-600 text-white"
-                      : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                  }`}
+                  className={`px-4 py-2 rounded-lg font-medium transition-colors ${selectedCategory === category
+                    ? "bg-blue-600 text-white"
+                    : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                    }`}
                 >
                   {category.charAt(0).toUpperCase() + category.slice(1)}
                 </button>
@@ -337,223 +477,233 @@ export default function StudentRegister() {
             {filteredPrograms.map((program) => {
               // Filter classes to only show those with tutors
               const classesWithTutors = program.classes.filter(classItem => classItem.tutor_name && classItem.tutor_name.trim() !== '');
-              
+
               // Skip programs with no classes that have tutors
               if (classesWithTutors.length === 0) return null;
-              
+
               return (
                 <div
                   key={program.id}
                   className="bg-white rounded-lg shadow-sm overflow-hidden"
                 >
                   <div className="p-6">
-                <div className="flex items-start justify-between mb-3">
-                  <div className="flex-1">
-                    <h3 className="text-xl font-semibold text-gray-900 mb-1">
-                      {program.program_code} - {program.name}
-                    </h3>
-                    <p className="text-gray-600 text-sm">
-                      {program.description}
-                    </p>
-                  </div>
-                  <span
-                    className={`px-3 py-1 text-xs font-medium rounded ml-4 ${getStatusBadge(
-                      program.status
-                    )}`}
-                  >
-                    {program.status}
-                  </span>
-                </div>
-
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-6 text-sm text-gray-500">
-                    <div className="flex items-center">
-                      <Users className="h-4 w-4 mr-2" />
-                      <span>
-                        {getTotalEnrolled(classesWithTutors)} students enrolled
-                      </span>
-                    </div>
-                    <div className="flex items-center">
-                      <User className="h-4 w-4 mr-2" />
-                      <span>
-                        {classesWithTutors.length}{" "}
-                        {classesWithTutors.length === 1 ? "class" : "classes"}{" "}
-                        available
-                      </span>
-                    </div>
-                  </div>
-                  <button
-                    onClick={() => toggleProgram(program.id)}
-                    className="flex items-center gap-2 px-4 py-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors font-medium"
-                  >
-                    {expandedPrograms[program.id] ? (
-                      <>
-                        <span>Hide Classes</span>
-                        <ChevronUp className="h-4 w-4" />
-                      </>
-                    ) : (
-                      <>
-                        <span>View Classes</span>
-                        <ChevronDown className="h-4 w-4" />
-                      </>
-                    )}
-                  </button>
-                </div>
-
-                {expandedPrograms[program.id] && (
-                  <div className="border-t pt-4 space-y-4">
-                    {classesWithTutors.map((classData) => (
-                      <div
-                        key={classData.id}
-                        className="border-2 border-gray-200 rounded-xl overflow-hidden bg-white shadow-sm hover:shadow-md transition-shadow"
+                    <div className="flex items-start justify-between mb-3">
+                      <div className="flex-1">
+                        <h3 className="text-xl font-semibold text-gray-900 mb-1">
+                          {program.program_code} - {program.name}
+                        </h3>
+                        <p className="text-gray-600 text-sm">
+                          {program.description}
+                        </p>
+                      </div>
+                      <span
+                        className={`px-3 py-1 text-xs font-medium rounded ml-4 ${getStatusBadge(
+                          program.status
+                        )}`}
                       >
-                        {/* Class Header */}
-                        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-5 border-b border-blue-100">
-                          <div className="flex items-start justify-between">
-                            <div className="flex-1">
-                              <div className="flex items-center gap-3 mb-3">
-                                <div className="w-12 h-12 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-xl flex items-center justify-center shadow-md">
-                                  <User className="w-6 h-6 text-white" />
-                                </div>
-                                <div className="flex items-center gap-3">
-                                  <div className="px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-lg shadow-md">
-                                    <h4 className="text-2xl font-bold text-white">
-                                      {classData.class_code}
-                                    </h4>
+                        {program.status}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="flex items-center gap-6 text-sm text-gray-500">
+                        <div className="flex items-center">
+                          <Users className="h-4 w-4 mr-2" />
+                          <span>
+                            {getTotalEnrolled(classesWithTutors)} students enrolled
+                          </span>
+                        </div>
+                        <div className="flex items-center">
+                          <User className="h-4 w-4 mr-2" />
+                          <span>
+                            {classesWithTutors.length}{" "}
+                            {classesWithTutors.length === 1 ? "class" : "classes"}{" "}
+                            available
+                          </span>
+                        </div>
+                      </div>
+                      <div className="flex gap-2">
+                        {/* Auto Match Button */}
+                        {!isEnrolledInProgram(program.id) && program.status === "active" && (
+                          <button
+                            onClick={() => handleAutoMatch(program)}
+                            disabled={registering}
+                            className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-green-600 to-emerald-600 text-white hover:from-green-700 hover:to-emerald-700 rounded-lg transition-all font-medium shadow-sm hover:shadow disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            <span>{registering ? "Matching..." : "Auto Match"}</span>
+                          </button>
+                        )}
+                        <button
+                          onClick={() => toggleProgram(program.id)}
+                          className="flex items-center gap-2 px-4 py-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors font-medium"
+                        >
+                          {expandedPrograms[program.id] ? (
+                            <>
+                              <span>Hide Classes</span>
+                              <ChevronUp className="h-4 w-4" />
+                            </>
+                          ) : (
+                            <>
+                              <span>View Classes</span>
+                              <ChevronDown className="h-4 w-4" />
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    </div>
+
+                    {expandedPrograms[program.id] && (
+                      <div className="border-t pt-4 space-y-4">
+                        {classesWithTutors.map((classData) => (
+                          <div
+                            key={classData.id}
+                            className="border-2 border-gray-200 rounded-xl overflow-hidden bg-white shadow-sm hover:shadow-md transition-shadow"
+                          >
+                            {/* Class Header */}
+                            <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-5 border-b border-blue-100">
+                              <div className="flex items-start justify-between">
+                                <div className="flex-1">
+                                  <div className="flex items-center gap-3 mb-3">
+                                    <div className="w-12 h-12 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-xl flex items-center justify-center shadow-md">
+                                      <User className="w-6 h-6 text-white" />
+                                    </div>
+                                    <div className="flex items-center gap-3">
+                                      <div className="px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-lg shadow-md">
+                                        <h4 className="text-2xl font-bold text-white">
+                                          {classData.class_code}
+                                        </h4>
+                                      </div>
+                                      {isAlreadyEnrolled(classData.id) && (
+                                        <span className="px-3 py-1 bg-green-100 text-green-700 text-sm font-semibold rounded-full border border-green-300">
+                                          ✓ Enrolled
+                                        </span>
+                                      )}
+                                    </div>
                                   </div>
-                                  {isAlreadyEnrolled(classData.id) && (
-                                    <span className="px-3 py-1 bg-green-100 text-green-700 text-sm font-semibold rounded-full border border-green-300">
-                                      ✓ Enrolled
-                                    </span>
+                                  <div className="flex items-center gap-6 ml-14">
+                                    <div className="flex items-center gap-3 bg-gradient-to-r from-purple-50 to-pink-50 px-4 py-2 rounded-lg border border-purple-200">
+                                      <span className="text-3xl">👨‍🏫</span>
+                                      <div>
+                                        <span className="text-purple-600 text-xs font-medium uppercase tracking-wide">Instructor</span>
+                                        <p className="font-bold text-gray-900 text-base">{classData.tutor_name}</p>
+                                      </div>
+                                    </div>
+                                    <div className="flex items-center gap-3 bg-gradient-to-r from-green-50 to-emerald-50 px-4 py-2 rounded-lg border border-green-200">
+                                      <span className="text-3xl">👥</span>
+                                      <div>
+                                        <span className="text-green-600 text-xs font-medium uppercase tracking-wide">Capacity</span>
+                                        <p className="font-bold text-gray-900 text-base">
+                                          {classData.current_students}/{classData.max_students} students
+                                        </p>
+                                      </div>
+                                    </div>
+                                  </div>
+                                </div>
+                                <div className="flex gap-2">
+                                  {isAlreadyEnrolled(classData.id) ? (
+                                    <button
+                                      onClick={() => handleUnregister(classData.id)}
+                                      disabled={unregistering[classData.id]}
+                                      className="flex items-center gap-2 px-6 py-3 text-base text-red-600 bg-white hover:bg-red-50 rounded-lg transition-all font-semibold disabled:opacity-50 disabled:cursor-not-allowed border-2 border-red-300 shadow-sm hover:shadow"
+                                    >
+                                      <X className="w-5 h-5" />
+                                      {unregistering[classData.id] ? "Unregistering..." : "Unregister"}
+                                    </button>
+                                  ) : (
+                                    <button
+                                      onClick={() => handleRegister(program, classData)}
+                                      disabled={!canRegister(program, classData)}
+                                      className={`px-8 py-3 text-base rounded-lg font-semibold transition-all shadow-sm ${canRegister(program, classData)
+                                        ? "bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:from-blue-700 hover:to-indigo-700 hover:shadow-md"
+                                        : "bg-gray-200 text-gray-500 cursor-not-allowed"
+                                        }`}
+                                    >
+                                      {isEnrolledInProgram(program.id)
+                                        ? "Already in Program"
+                                        : isFull(classData)
+                                          ? "Class Full"
+                                          : program.status === "completed"
+                                            ? "Completed"
+                                            : program.status === "upcoming"
+                                              ? "Coming Soon"
+                                              : "Register Now"}
+                                    </button>
                                   )}
                                 </div>
                               </div>
-                              <div className="flex items-center gap-6 ml-14">
-                                <div className="flex items-center gap-3 bg-gradient-to-r from-purple-50 to-pink-50 px-4 py-2 rounded-lg border border-purple-200">
-                                  <span className="text-3xl">👨‍🏫</span>
-                                  <div>
-                                    <span className="text-purple-600 text-xs font-medium uppercase tracking-wide">Instructor</span>
-                                    <p className="font-bold text-gray-900 text-base">{classData.tutor_name}</p>
-                                  </div>
-                                </div>
-                                <div className="flex items-center gap-3 bg-gradient-to-r from-green-50 to-emerald-50 px-4 py-2 rounded-lg border border-green-200">
-                                  <span className="text-3xl">👥</span>
-                                  <div>
-                                    <span className="text-green-600 text-xs font-medium uppercase tracking-wide">Capacity</span>
-                                    <p className="font-bold text-gray-900 text-base">
-                                      {classData.current_students}/{classData.max_students} students
-                                    </p>
-                                  </div>
-                                </div>
+                            </div>
+
+                            {/* Schedule Details */}
+                            <div className="p-6 bg-gray-50">
+                              <div className="flex items-center gap-2 mb-5">
+                                <span className="text-2xl">📅</span>
+                                <h5 className="text-lg font-bold text-gray-800">Class Schedule</h5>
+                              </div>
+                              <div className="overflow-x-auto bg-white rounded-lg border border-gray-200">
+                                <table className="w-full">
+                                  <thead>
+                                    <tr className="border-b-2 border-gray-200 bg-gradient-to-r from-gray-50 to-gray-100">
+                                      <th className="text-left py-4 px-5 font-bold text-gray-800 text-lg">Day</th>
+                                      <th className="text-left py-4 px-5 font-bold text-gray-800 text-lg">Periods</th>
+                                      <th className="text-left py-4 px-5 font-bold text-gray-800 text-lg">Room</th>
+                                      <th className="text-left py-4 px-5 font-bold text-gray-800 text-lg">Weeks</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {groupScheduleByDay(classData.schedule).map((scheduleItem, idx) => {
+                                      // Generate weeks 35-50
+                                      const allWeeks = Array.from({ length: 16 }, (_, i) => i + 35);
+                                      const scheduledWeeks = scheduleItem.scheduledWeeks || [];
+
+                                      return (
+                                        <tr
+                                          key={idx}
+                                          className="border-b border-gray-100 last:border-0 hover:bg-blue-50 transition-colors"
+                                        >
+                                          <td className="py-5 px-5 font-bold text-gray-900 text-base">
+                                            {getDayName(scheduleItem.day)}
+                                          </td>
+                                          <td className="py-5 px-5">
+                                            <span className="inline-block px-4 py-1.5 bg-blue-100 text-blue-700 rounded-full font-semibold text-sm">
+                                              {scheduleItem.periodsFormatted}
+                                            </span>
+                                          </td>
+                                          <td className="py-5 px-5">
+                                            <span className="inline-block min-w-[100px] px-4 py-2 bg-gradient-to-r from-purple-100 to-pink-100 text-purple-700 rounded-lg font-bold text-sm border border-purple-300 shadow-sm text-center">
+                                              {scheduleItem.room || 'TBA'}
+                                            </span>
+                                          </td>
+                                          <td className="py-5 px-5">
+                                            <div className="flex flex-wrap gap-2">
+                                              {allWeeks.map((week) => {
+                                                const isScheduled = scheduledWeeks.includes(week);
+                                                return (
+                                                  <span
+                                                    key={week}
+                                                    className={`inline-block px-3 py-1.5 rounded-md text-sm font-bold shadow-sm ${isScheduled
+                                                      ? "bg-gradient-to-r from-green-100 to-emerald-100 text-green-700 border border-green-300"
+                                                      : "bg-gray-200 text-gray-500"
+                                                      }`}
+                                                  >
+                                                    {week}
+                                                  </span>
+                                                );
+                                              })}
+                                            </div>
+                                          </td>
+                                        </tr>
+                                      );
+                                    })}
+                                  </tbody>
+                                </table>
                               </div>
                             </div>
-                            <div className="flex gap-2">
-                              {isAlreadyEnrolled(classData.id) ? (
-                                <button
-                                  onClick={() => handleUnregister(classData.id)}
-                                  disabled={unregistering[classData.id]}
-                                  className="flex items-center gap-2 px-6 py-3 text-base text-red-600 bg-white hover:bg-red-50 rounded-lg transition-all font-semibold disabled:opacity-50 disabled:cursor-not-allowed border-2 border-red-300 shadow-sm hover:shadow"
-                                >
-                                  <X className="w-5 h-5" />
-                                  {unregistering[classData.id] ? "Unregistering..." : "Unregister"}
-                                </button>
-                              ) : (
-                                <button
-                                  onClick={() => handleRegister(program, classData)}
-                                  disabled={!canRegister(program, classData)}
-                                  className={`px-8 py-3 text-base rounded-lg font-semibold transition-all shadow-sm ${
-                                    canRegister(program, classData)
-                                      ? "bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:from-blue-700 hover:to-indigo-700 hover:shadow-md"
-                                      : "bg-gray-200 text-gray-500 cursor-not-allowed"
-                                  }`}
-                                >
-                                  {isEnrolledInProgram(program.id)
-                                    ? "Already in Program"
-                                    : isFull(classData)
-                                    ? "Class Full"
-                                    : program.status === "completed"
-                                    ? "Completed"
-                                    : program.status === "upcoming"
-                                    ? "Coming Soon"
-                                    : "Register Now"}
-                                </button>
-                              )}
-                            </div>
                           </div>
-                        </div>
-
-                        {/* Schedule Details */}
-                        <div className="p-6 bg-gray-50">
-                          <div className="flex items-center gap-2 mb-5">
-                            <span className="text-2xl">📅</span>
-                            <h5 className="text-lg font-bold text-gray-800">Class Schedule</h5>
-                          </div>
-                          <div className="overflow-x-auto bg-white rounded-lg border border-gray-200">
-                            <table className="w-full">
-                              <thead>
-                                <tr className="border-b-2 border-gray-200 bg-gradient-to-r from-gray-50 to-gray-100">
-                                  <th className="text-left py-4 px-5 font-bold text-gray-800 text-lg">Day</th>
-                                  <th className="text-left py-4 px-5 font-bold text-gray-800 text-lg">Periods</th>
-                                  <th className="text-left py-4 px-5 font-bold text-gray-800 text-lg">Room</th>
-                                  <th className="text-left py-4 px-5 font-bold text-gray-800 text-lg">Weeks</th>
-                                </tr>
-                              </thead>
-                              <tbody>
-                                {groupScheduleByDay(classData.schedule).map((scheduleItem, idx) => {
-                                  // Generate weeks 35-50
-                                  const allWeeks = Array.from({ length: 16 }, (_, i) => i + 35);
-                                  const scheduledWeeks = scheduleItem.scheduledWeeks || [];
-                                  
-                                  return (
-                                    <tr
-                                      key={idx}
-                                      className="border-b border-gray-100 last:border-0 hover:bg-blue-50 transition-colors"
-                                    >
-                                      <td className="py-5 px-5 font-bold text-gray-900 text-base">
-                                        {getDayName(scheduleItem.day)}
-                                      </td>
-                                      <td className="py-5 px-5">
-                                        <span className="inline-block px-4 py-1.5 bg-blue-100 text-blue-700 rounded-full font-semibold text-sm">
-                                          {scheduleItem.periodsFormatted}
-                                        </span>
-                                      </td>
-                                      <td className="py-5 px-5">
-                                        <span className="inline-block min-w-[100px] px-4 py-2 bg-gradient-to-r from-purple-100 to-pink-100 text-purple-700 rounded-lg font-bold text-sm border border-purple-300 shadow-sm text-center">
-                                          {scheduleItem.room || 'TBA'}
-                                        </span>
-                                      </td>
-                                      <td className="py-5 px-5">
-                                        <div className="flex flex-wrap gap-2">
-                                          {allWeeks.map((week) => {
-                                            const isScheduled = scheduledWeeks.includes(week);
-                                            return (
-                                              <span
-                                                key={week}
-                                                className={`inline-block px-3 py-1.5 rounded-md text-sm font-bold shadow-sm ${
-                                                  isScheduled
-                                                    ? "bg-gradient-to-r from-green-100 to-emerald-100 text-green-700 border border-green-300"
-                                                    : "bg-gray-200 text-gray-500"
-                                                }`}
-                                              >
-                                                {week}
-                                              </span>
-                                            );
-                                          })}
-                                        </div>
-                                      </td>
-                                    </tr>
-                                  );
-                                })}
-                              </tbody>
-                            </table>
-                          </div>
-                        </div>
+                        ))}
                       </div>
-                    ))}
+                    )}
                   </div>
-                )}
-              </div>
-            </div>
+                </div>
               );
             })}
 
@@ -568,14 +718,32 @@ export default function StudentRegister() {
         )}
       </div>
 
-          <ConfirmRegistrationModal
-      isOpen={showModal}
-      onClose={() => setShowModal(false)}
-      selectedClass={selectedClass}
-      onConfirm={confirmRegistration}
-      isRegistering={registering}
-    />
-      
+      <ConfirmRegistrationModal
+        isOpen={showModal}
+        onClose={() => setShowModal(false)}
+        selectedClass={selectedClass}
+        onConfirm={confirmRegistration}
+        isRegistering={registering}
+      />
+
+      <NotificationModal
+        isOpen={notification.isOpen}
+        onClose={closeNotification}
+        title={notification.title}
+        message={notification.message}
+        type={notification.type}
+      />
+
+      <ConfirmationModal
+        isOpen={confirmation.isOpen}
+        onClose={closeConfirmation}
+        onConfirm={handleConfirmAction}
+        title={confirmation.title}
+        message={confirmation.message}
+        confirmText={confirmation.confirmText}
+        confirmButtonClass={confirmation.confirmButtonClass}
+      />
+
     </div>
   );
 }

@@ -27,7 +27,7 @@ export default function StudentHomePage() {
       try {
         setLoading(true);
         const enrollments = await studentService.getStudentEnrollments(user.details.id);
-        
+
         // Transform enrollment data to match the expected format
         const programs = enrollments.map(enrollment => ({
           program_id: enrollment.program?.id,
@@ -38,7 +38,7 @@ export default function StudentHomePage() {
           tutor_name: enrollment.class?.tutorName,
           enrolled_at: enrollment.enrolledAt
         }));
-        
+
         setCourses(programs);
       } catch (error) {
         console.error("Error fetching student programs:", error);
@@ -54,11 +54,11 @@ export default function StudentHomePage() {
   // Manual refresh function
   const handleRefresh = async () => {
     if (!user || !user.details?.id || user.role !== "student") return;
-    
+
     try {
       setLoading(true);
       const enrollments = await studentService.getStudentEnrollments(user.details.id);
-      
+
       // Transform enrollment data to match the expected format
       const programs = enrollments.map(enrollment => ({
         program_id: enrollment.program?.id,
@@ -69,7 +69,7 @@ export default function StudentHomePage() {
         tutor_name: enrollment.class?.tutorName,
         enrolled_at: enrollment.enrolledAt
       }));
-      
+
       setCourses(programs);
     } catch (error) {
       console.error("Error refreshing student programs:", error);
@@ -95,7 +95,7 @@ export default function StudentHomePage() {
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-3xl font-bold text-gray-800">
-                Welcome back, {user?.full_name || user?.email || 'User'}! 
+                Welcome back, {user?.full_name || user?.email || 'User'}!
               </h1>
               {/* <p className="text-sm text-gray-500 mt-1">
                 Role: {user?.role || 'Unknown'} • {user?.role === 'student' ? 'Viewing your enrolled programs' : 'Dashboard'}
@@ -159,7 +159,7 @@ export default function StudentHomePage() {
               </p>
 
               <Link
-                to={`/courses/${program.program_id}`}
+                to={`/courses/${program.class_id}`}
                 state={{ program }}
                 className="inline-block mt-2 text-indigo-600 font-medium hover:underline text-sm"
               >
