@@ -82,14 +82,30 @@ describe('StudentRegister', () => {
   ];
 
   beforeEach(() => {
+    // Mock global functions
+    global.alert = jest.fn();
+    global.confirm = jest.fn(() => true);
+
+    // Suppress console.log and console.error for cleaner test output
+    jest.spyOn(console, 'log').mockImplementation(() => { });
+    jest.spyOn(console, 'error').mockImplementation(() => { });
+
     mockUseUser.mockReturnValue({ user: mockUser, loading: false });
     programService.getProgramsForRegistration.mockResolvedValue(mockPrograms);
     studentService.getStudentEnrollments.mockResolvedValue([]);
     jest.clearAllMocks();
     // Re-setup mocks after clearing
+    global.alert = jest.fn();
+    global.confirm = jest.fn(() => true);
     mockUseUser.mockReturnValue({ user: mockUser, loading: false });
     programService.getProgramsForRegistration.mockResolvedValue(mockPrograms);
     studentService.getStudentEnrollments.mockResolvedValue([]);
+  });
+
+  afterEach(() => {
+    // Restore console
+    console.log.mockRestore();
+    console.error.mockRestore();
   });
 
   it('renders program list after loading', async () => {
@@ -222,14 +238,15 @@ describe('StudentRegister', () => {
     const confirmButton = screen.getByRole('button', { name: /confirm registration/i });
     await userEvent.click(confirmButton);
 
-    // Verify service called
+    // Verify service called and success notification appears
     await waitFor(() => {
       expect(studentService.enrollStudentInClass).toHaveBeenCalledWith('student-123', 'class-1');
-      expect(global.alert).toHaveBeenCalled();
+      // Check for success notification modal
+      expect(screen.getByText(/registration successful/i)).toBeInTheDocument();
     });
   });
 
-  it('shows error alert when registration fails', async () => {
+  it('shows error notification when registration fails', async () => {
     studentService.enrollStudentInClass = jest.fn().mockRejectedValue(new Error('Registration failed'));
 
     render(<StudentRegister />);
@@ -253,11 +270,15 @@ describe('StudentRegister', () => {
       expect(screen.getByRole('button', { name: /confirm registration/i })).toBeInTheDocument();
     });
 
-      const confirmButton = screen.getByRole('button', { name: /confirm registration/i });
+    const confirmButton = screen.getByRole('button', { name: /confirm registration/i });
     await userEvent.click(confirmButton);
 
+    // Check for error notification modal
     await waitFor(() => {
-      expect(global.alert).toHaveBeenCalledWith(expect.stringContaining('failed'));
+      // There might be multiple elements with "Registration Failed" (title and message)
+      // We can check that at least one exists
+      const errorMessages = screen.getAllByText(/registration failed/i);
+      expect(errorMessages.length).toBeGreaterThan(0);
     });
   });
 
@@ -265,9 +286,9 @@ describe('StudentRegister', () => {
     studentService.getStudentEnrollments.mockResolvedValue([
       {
         enrollmentId: 'enroll-1',
-        class: { 
+        class: {
           id: 'class-1',
-          classCode: 'CS101-01' 
+          classCode: 'CS101-01'
         }
       }
     ]);
@@ -353,14 +374,13 @@ describe('StudentRegister', () => {
     studentService.getStudentEnrollments.mockResolvedValue([
       {
         enrollmentId: 'enroll-1',
-        class: { 
+        class: {
           id: 'class-1',
-          classCode: 'CS101-01' 
+          classCode: 'CS101-01'
         }
       }
     ]);
     studentService.unenrollStudentFromClass = jest.fn().mockResolvedValue({ success: true });
-    global.confirm = jest.fn(() => true);
 
     render(<StudentRegister />);
 
@@ -380,9 +400,22 @@ describe('StudentRegister', () => {
     const unregisterButton = screen.getByRole('button', { name: /unregister/i });
     await userEvent.click(unregisterButton);
 
+    // Wait for confirmation modal and click confirm
     await waitFor(() => {
-      expect(global.confirm).toHaveBeenCalled();
+      expect(screen.getByText(/are you sure you want to unregister/i)).toBeInTheDocument();
+    });
+
+    // Find the confirm button in the modal (it usually has text "Unregister" or "Confirm")
+    // There are two "Unregister" buttons now (one in list, one in modal)
+    // The one in the modal is the last one rendered
+    const unregisterButtons = screen.getAllByRole('button', { name: /^unregister$/i });
+    const confirmUnregisterButton = unregisterButtons[unregisterButtons.length - 1];
+    await userEvent.click(confirmUnregisterButton);
+
+    await waitFor(() => {
       expect(studentService.unenrollStudentFromClass).toHaveBeenCalledWith('student-123', 'class-1');
+      // Check for success notification
+      expect(screen.getByText(/successfully unregistered/i)).toBeInTheDocument();
     });
   });
 });

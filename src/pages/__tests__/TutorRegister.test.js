@@ -76,6 +76,26 @@ const loggedInUser = {
   email: 'tutor@example.com'
 };
 
+// Suppress act() warnings - these are expected for async state updates in tests
+const originalError = console.error;
+beforeAll(() => {
+  console.error = (...args) => {
+    if (
+      typeof args[0] === 'string' &&
+      args[0].includes('Warning: An update to') &&
+      args[0].includes('was not wrapped in act')
+    ) {
+      return;
+    }
+    originalError.call(console, ...args);
+  };
+});
+
+afterAll(() => {
+  console.error = originalError;
+  jest.resetModules();
+});
+
 beforeEach(() => {
   jest.clearAllMocks();
   global.alert = jest.fn();
@@ -83,10 +103,6 @@ beforeEach(() => {
   programService.getProgramsWithClasses.mockResolvedValue(basePrograms);
   programService.getTakenSchedules.mockResolvedValue([]);
   mockUseUser.mockReturnValue({ user: loggedInUser, loading: false });
-});
-
-afterAll(() => {
-  jest.resetModules();
 });
 
 describe('TutorRegister', () => {
