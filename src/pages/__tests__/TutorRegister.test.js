@@ -33,14 +33,15 @@ jest.mock('../../components/ClassCard', () => ({ classItem, onClassSelect }) => 
 ));
 
 // Auto-select room when modal opens
-jest.mock('../../components/RoomSelectionModal', () => {
-  return function MockRoomSelectionModal({ isOpen, onSelectRoom }) {
-    if (isOpen) {
-      onSelectRoom('R101');
-    }
-    return null;
-  };
-});
+// Simulate user interaction for Room Selection
+jest.mock('../../components/RoomSelectionModal', () => ({ isOpen, onSelectRoom }) => (
+  isOpen ? <button onClick={() => onSelectRoom('R101')}>Select Room</button> : null
+));
+
+// Simulate user interaction for Mode Selection
+jest.mock('../../components/ModeSelectionModal', () => ({ isOpen, onSelectMode }) => (
+  isOpen ? <button onClick={() => onSelectMode('online')}>Confirm Online Mode</button> : null
+));
 
 const basePrograms = [
   {
@@ -82,7 +83,7 @@ beforeAll(() => {
   console.error = (...args) => {
     if (
       typeof args[0] === 'string' &&
-      args[0].includes('Warning: An update to') &&
+      args[0].includes('An update to') &&
       args[0].includes('was not wrapped in act')
     ) {
       return;
@@ -98,8 +99,8 @@ afterAll(() => {
 
 beforeEach(() => {
   jest.clearAllMocks();
-  global.alert = jest.fn();
-  global.confirm = jest.fn(() => true);
+  jest.spyOn(window, 'alert').mockImplementation(() => { });
+  jest.spyOn(window, 'confirm').mockImplementation(() => true);
   programService.getProgramsWithClasses.mockResolvedValue(basePrograms);
   programService.getTakenSchedules.mockResolvedValue([]);
   mockUseUser.mockReturnValue({ user: loggedInUser, loading: false });
@@ -214,13 +215,19 @@ describe('TutorRegister', () => {
     // Click two different slots (day-period combos)
     const allSlotsInitial = screen.getAllByTitle(/Click to configure/i);
     await userEvent.click(allSlotsInitial[0]);
+    await userEvent.click(screen.getByText('Confirm Online Mode'));
+
     const allSlotsAfterFirst = screen.getAllByTitle(/Click to configure/i);
     await userEvent.click(allSlotsAfterFirst[1]);
+    await userEvent.click(screen.getByText('Confirm Online Mode'));
+
     const allSlotsAfterSecond = screen.getAllByTitle(/Click to configure/i);
     await userEvent.click(allSlotsAfterSecond[2]); // triggers alert (third period)
+    await userEvent.click(screen.getByText('Confirm Online Mode'));
 
     await waitFor(() => {
-      expect(global.alert).toHaveBeenCalledWith(expect.stringContaining('You can only have'));
+      expect(screen.getByText(/Limit Reached/i)).toBeInTheDocument();
+      expect(screen.getByText(/You can only have/i)).toBeInTheDocument();
     });
   });
 
@@ -235,10 +242,14 @@ describe('TutorRegister', () => {
 
     const [slot] = screen.getAllByTitle(/Click to configure/i);
     await userEvent.click(slot); // configure
+    await userEvent.click(screen.getByText('Confirm Online Mode'));
+
     await userEvent.click(slot); // duplicate attempt triggers alert
+    await userEvent.click(screen.getByText('Confirm Online Mode'));
 
     await waitFor(() => {
-      expect(global.alert).toHaveBeenCalledWith('This time slot is already configured.');
+      expect(screen.getByText(/Slot Configured/i)).toBeInTheDocument();
+      expect(screen.getByText(/This time slot is already configured/i)).toBeInTheDocument();
     });
   });
 
@@ -258,20 +269,24 @@ describe('TutorRegister', () => {
     // configure required periods
     const slots = screen.getAllByTitle(/Click to configure/i);
     await userEvent.click(slots[0]);
+    await userEvent.click(screen.getByText('Confirm Online Mode'));
+
     await userEvent.click(slots[1]);
+    await userEvent.click(screen.getByText('Confirm Online Mode'));
 
     await waitFor(() => {
       expect(submitBtn).toBeEnabled();
     });
 
     await userEvent.click(submitBtn);
+
     await waitFor(() => {
       expect(programService.saveSchedulesForClass).toHaveBeenCalledWith(
         'c1',
         expect.any(Object),
         expect.objectContaining({ id: 'tutor-123' })
       );
-      expect(global.alert).toHaveBeenCalledWith('Tutor assignment successful!');
+      expect(screen.getByText(/Tutor assignment successful/i)).toBeInTheDocument();
     });
   });
 
@@ -290,7 +305,10 @@ describe('TutorRegister', () => {
     // configure periods (2 required)
     const slots = screen.getAllByTitle(/Click to configure/i);
     await userEvent.click(slots[0]);
+    await userEvent.click(screen.getByText('Confirm Online Mode'));
+
     await userEvent.click(slots[1]);
+    await userEvent.click(screen.getByText('Confirm Online Mode'));
 
     await waitFor(() => {
       expect(submitBtn).toBeEnabled();
@@ -303,7 +321,8 @@ describe('TutorRegister', () => {
         expect.any(Object),
         expect.objectContaining({ id: 'tutor-123' })
       );
-      expect(global.alert).toHaveBeenCalledWith('Tutor assignment updated successfully!');
+      // updateTutorAssignment in component uses alert()
+      expect(window.alert).toHaveBeenCalledWith('Tutor assignment updated successfully!');
     });
   });
 
@@ -319,7 +338,7 @@ describe('TutorRegister', () => {
 
     await waitFor(() => {
       expect(programService.unregisterTutorFromClass).toHaveBeenCalledWith('c2');
-      expect(global.alert).toHaveBeenCalledWith('Successfully unregistered from the class!');
+      expect(screen.getByText(/Successfully unregistered/i)).toBeInTheDocument();
     });
   });
 });
