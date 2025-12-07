@@ -49,7 +49,9 @@ class StudentService {
     password,
     studentCode,
     major,
-    faculty = "Computer Science and Engineering"
+    faculty = "Computer Science and Engineering",
+    academicYear = 2024,
+    gpa = 0.0
   ) {
     // Step 1: Register the user in Supabase Auth
     const { data: signUpData, error: signUpError } = await supabase.auth.signUp(
@@ -86,17 +88,19 @@ class StudentService {
         user_id: userId,
         student_code: studentCode,
         major: major,
-        faculty: faculty
+        faculty: faculty,
+        academic_year: academicYear,
+        gpa: gpa
       })
       .select()
       .single();
 
     if (studentError) throw studentError;
 
-    return { 
-      userId, 
+    return {
+      userId,
       studentId: studentData.id,
-      studentCode: studentData.student_code 
+      studentCode: studentData.student_code
     };
   }
 
@@ -183,8 +187,8 @@ class StudentService {
     // Step 4: Update the current_students count in the class
     const { error: updateError } = await supabase
       .from("classes")
-      .update({ 
-        current_students: classData.current_students + 1 
+      .update({
+        current_students: classData.current_students + 1
       })
       .eq("id", classId);
 
@@ -240,7 +244,7 @@ class StudentService {
     // Step 4: Update the current_students count in the class
     const { error: updateError } = await supabase
       .from("classes")
-      .update({ 
+      .update({
         current_students: Math.max(0, classData.current_students - 1)
       })
       .eq("id", classId);
@@ -265,11 +269,18 @@ class StudentService {
           tutor_name,
           max_students,
           current_students,
+          current_students,
           programs (
             id,
             program_code,
             name,
             description
+          ),
+          schedules (
+            day,
+            period,
+            weeks,
+            room
           )
         )
       `)
@@ -299,10 +310,53 @@ class StudentService {
           name: programData.name,
           description: programData.description,
         } : null,
+        schedule: classData?.schedules || []
       };
     });
 
     return formatted;
+  }
+  async getStudentWeeklySchedule(studentId) {
+    const { data, error } = await supabase
+      .from("student_classes")
+      .select(`
+        classes (
+          id,
+          class_code,
+          tutor_name,
+          programs (
+            name
+          ),
+          schedules (
+            day,
+            period,
+            weeks,
+            room
+          )
+        )
+      `)
+      .eq("student_id", studentId);
+
+    if (error) throw error;
+
+    // Flatten the result to a list of schedule items
+    const scheduleItems = [];
+    data.forEach(enrollment => {
+      const classInfo = enrollment.classes;
+      if (classInfo && classInfo.schedules) {
+        classInfo.schedules.forEach(schedule => {
+          scheduleItems.push({
+            ...schedule,
+            class_code: classInfo.class_code,
+            tutor_name: classInfo.tutor_name,
+            program_name: classInfo.programs?.name || "Unknown Program",
+            class_id: classInfo.id
+          });
+        });
+      }
+    });
+
+    return scheduleItems;
   }
 }
 

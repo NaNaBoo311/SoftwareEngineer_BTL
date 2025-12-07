@@ -12,6 +12,7 @@ import ProtectedRoute from "./components/ProtectedRoute";
 import TutorRegister from "./pages/TutorRegister";
 import CourseSpecific from "./pages/CourseSpecific";
 import TutorSchedule from "./pages/TutorSchedule";
+import StudentSchedule from "./pages/StudentSchedule";
 import TutorHomePage from "./pages/TutorHomePage";
 import { UserProvider } from "./context/UserContext";
 
@@ -127,6 +128,16 @@ export default function App() {
               <ProtectedRoute>
                 <Layout>
                   <TutorSchedule />
+                </Layout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/student-schedule"
+            element={
+              <ProtectedRoute>
+                <Layout>
+                  <StudentSchedule />
                 </Layout>
               </ProtectedRoute>
             }

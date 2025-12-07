@@ -137,6 +137,15 @@ export default function StudentRegister() {
   };
 
   const handleRegister = (programData, classData) => {
+    const overlap = checkScheduleOverlap(classData.schedule, studentEnrollments);
+    if (overlap) {
+      showNotification(
+        `Time conflict detected with ${overlap.conflictingClass} on ${getDayName(overlap.day)} Period ${overlap.period}.`,
+        "error",
+        "Schedule Conflict"
+      );
+      return;
+    }
     setSelectedClass({ program: programData, class: classData });
     setShowModal(true);
   };
@@ -325,7 +334,59 @@ export default function StudentRegister() {
     );
   };
 
-  // Auto Match - randomly select an available class and enroll
+  // Calculate match score between student and tutor/class
+  const calculateMatchScore = (studentProfile, tutorData) => {
+    // Default values if data is missing
+    const studentFaculty = studentProfile?.faculty || "";
+    const studentGPA = studentProfile?.gpa || 0;
+    const studentAcademicYear = studentProfile?.academic_year || 1;
+
+    const tutorFaculty = tutorData?.faculty || "";
+    const tutorTeachingYear = tutorData?.teaching_year || 0;
+    const tutorRating = tutorData?.rating_star || 0;
+
+    // 1. faculty_match
+    const faculty_match = studentFaculty === tutorFaculty ? 1.0 : 0.0;
+
+    // 2. experience_score
+    const experience_score = Math.min(tutorTeachingYear, 20) / 20;
+
+    // 3. rating_score
+    const rating_score = Math.min(tutorRating, 1000) / 1000;
+
+    // 4. gpa_difficulty
+    const gpa_norm = studentGPA / 4;
+    const gpa_difficulty = 1 - gpa_norm;
+
+    // 5. academic_year_norm
+    const clampedYear = Math.max(0, Math.min(3, studentAcademicYear - 1));
+    const academic_year_norm = clampedYear / 3;
+
+    // Logistic Regression weights learned from training
+    const b = 1.17720421;
+    const w1 = 0.82373155; // faculty_match
+    const w2 = 1.33624093; // experience_score
+    const w3 = 0.51297459; // rating_score
+    const w4 = 0.15655953; // gpa_difficulty
+    const w5 = 0.14506848; // academic_year_norm
+
+    // compute raw score
+    const raw =
+      // b +
+      w1 * faculty_match +
+      w2 * experience_score +
+      w3 * rating_score +
+      w4 * gpa_difficulty +
+      w5 * academic_year_norm;
+
+    // sigmoid function
+    const sigmoid = (x) => 1 / (1 + Math.exp(-x));
+
+    // final match score between 0 and 1
+    return sigmoid(raw);
+  };
+
+  // Auto Match - calculate match scores and show top 5 classes
   const handleAutoMatch = async (program) => {
     if (!user || !user.details?.id) {
       showNotification("You must be logged in to use Auto Match.", "warning", "Login Required");
@@ -348,10 +409,12 @@ export default function StudentRegister() {
       classItem => classItem.tutor_name && classItem.tutor_name.trim() !== ''
     );
 
-    // Filter available classes (not full, not already enrolled)
-    const availableClasses = classesWithTutors.filter(classData =>
-      canRegister(program, classData)
-    );
+    // Filter available classes (not full, not already enrolled, NO OVERLAPS)
+    const availableClasses = classesWithTutors.filter(classData => {
+      const basicCheck = canRegister(program, classData);
+      const isOverlap = checkScheduleOverlap(classData.schedule, studentEnrollments);
+      return basicCheck && !isOverlap;
+    });
 
     if (availableClasses.length === 0) {
       showNotification(
@@ -362,25 +425,57 @@ export default function StudentRegister() {
       return;
     }
 
-    // Randomly select a class
-    const randomIndex = Math.floor(Math.random() * availableClasses.length);
-    const selectedClass = availableClasses[randomIndex];
+    // Get student profile from user.details
+    const studentProfile = {
+      faculty: user.details?.faculty || "",
+      gpa: user.details?.gpa || 0,
+      academic_year: user.details?.academic_year || 1,
+    };
 
-    // Show confirmation modal
+    // Calculate match scores for all available classes
+    const classesWithScores = availableClasses.map(classData => {
+      const tutorData = classData.tutor || null;
+      const matchScore = calculateMatchScore(studentProfile, tutorData);
+
+      return {
+        ...classData,
+        matchScore: matchScore,
+        matchPercentage: Math.round(matchScore * 100),
+      };
+    });
+
+    // Sort by match score (descending) and take top 5
+    const topClasses = classesWithScores
+      .sort((a, b) => b.matchScore - a.matchScore)
+      .slice(0, 5);
+
+    // Debug logging
+    console.log("Student Profile:", studentProfile);
+    console.log("Classes with Scores:", classesWithScores);
+    console.log("Top 5 Matches:", topClasses);
+
+    // Build message for confirmation modal with top 5 classes
+    const classListMessage = topClasses.map((cls, index) =>
+      `${index + 1}. ${cls.class_code} - ${cls.tutor_name} (Match: ${cls.matchPercentage}%)`
+    ).join('\n');
+
+    const fullMessage = `Auto Match found ${topClasses.length} recommended ${topClasses.length === 1 ? 'class' : 'classes'}:\n\n${classListMessage}\n\nEnrolling in the best match: ${topClasses[0].class_code} with ${topClasses[0].tutor_name} (${topClasses[0].matchPercentage}% match)`;
+
+    // Show confirmation modal with best match
     showConfirmation(
-      `Auto Match found:\n\nClass: ${selectedClass.class_code}\nInstructor: ${selectedClass.tutor_name}\n\nDo you want to enroll in this class?`,
+      fullMessage,
       async () => {
         try {
           setRegistering(true);
 
-          // Enroll the student in the randomly selected class
+          // Enroll the student in the best matching class
           await studentService.enrollStudentInClass(
             user.details.id,
-            selectedClass.id
+            topClasses[0].id
           );
 
           showNotification(
-            `Successfully enrolled in ${selectedClass.class_code} with ${selectedClass.tutor_name}!`,
+            `Successfully enrolled in ${topClasses[0].class_code} with ${topClasses[0].tutor_name}! (${topClasses[0].matchPercentage}% match)`,
             "success",
             "Auto Match Successful"
           );
@@ -413,11 +508,50 @@ export default function StudentRegister() {
     return studentEnrollments.some(enrollment => enrollment.program?.id === programId);
   };
 
+  const checkScheduleOverlap = (newClassSchedule, currentEnrollments) => {
+    // Flatten current enrollments into a list of schedule slots
+    const occupiedSlots = [];
+    currentEnrollments.forEach(enrollment => {
+      if (enrollment.schedule) {
+        enrollment.schedule.forEach(slot => {
+          occupiedSlots.push(slot);
+        });
+      }
+    });
+
+    // Check for overlaps
+    for (const newSlot of newClassSchedule) {
+      for (const occupied of occupiedSlots) {
+        // 1. Check if same day and period
+        if (newSlot.day === occupied.day && newSlot.period == occupied.period) { // loose equality for period
+          // 2. Check if weeks overlap
+          const newWeeks = Array.isArray(newSlot.weeks) ? newSlot.weeks : [newSlot.weeks];
+          const occupiedWeeks = Array.isArray(occupied.weeks) ? occupied.weeks : [occupied.weeks];
+
+          // Since weeks are likely strings like "35", we compare them
+          // If we had ranges "1-15", we'd parse. Assuming single values/strings for now.
+          const hasWeekOverlap = newWeeks.some(nw => occupiedWeeks.includes(nw));
+
+          if (hasWeekOverlap) {
+            return {
+              overlap: true,
+              conflictingClass: currentEnrollments.find(e => e.schedule.includes(occupied))?.class?.classCode || "Unknown Class",
+              day: newSlot.day,
+              period: newSlot.period
+            };
+          }
+        }
+      }
+    }
+    return null;
+  };
+
   const canRegister = (program, classData) => {
     if (program.status !== "active") return false;
     if (isFull(classData)) return false;
     if (isAlreadyEnrolled(classData.id)) return false;
     if (isEnrolledInProgram(program.id)) return false; // One class per program
+    // Note: Overlap check is expensive, maybe don't run it here for every render, but definitely run in AutoMatch filter
     return true;
   };
 
@@ -427,6 +561,11 @@ export default function StudentRegister() {
 
   const getTotalCapacity = (classes) => {
     return classes.reduce((sum, cls) => sum + cls.max_students, 0);
+  };
+
+  const formatRating = (totalStars, count) => {
+    if (!count || count === 0) return "New";
+    return (totalStars / count).toFixed(1);
   };
 
   return (
@@ -489,9 +628,20 @@ export default function StudentRegister() {
                   <div className="p-6">
                     <div className="flex items-start justify-between mb-3">
                       <div className="flex-1">
-                        <h3 className="text-xl font-semibold text-gray-900 mb-1">
-                          {program.program_code} - {program.name}
-                        </h3>
+                        <div className="flex items-center gap-2 mb-1">
+                          <h3 className="text-xl font-semibold text-gray-900">
+                            {program.program_code} - {program.name}
+                          </h3>
+                          <div className="flex items-center bg-yellow-50 px-2 py-0.5 rounded border border-yellow-200">
+                            <span className="text-yellow-500 mr-1">★</span>
+                            <span className="text-sm font-medium text-yellow-700">
+                              {formatRating(program.program_star, program.rating_count)}
+                            </span>
+                            {program.rating_count > 0 && (
+                              <span className="text-xs text-gray-500 ml-1">({program.rating_count})</span>
+                            )}
+                          </div>
+                        </div>
                         <p className="text-gray-600 text-sm">
                           {program.description}
                         </p>
@@ -584,7 +734,10 @@ export default function StudentRegister() {
                                     <div className="flex items-center gap-3 bg-gradient-to-r from-purple-50 to-pink-50 px-4 py-2 rounded-lg border border-purple-200">
                                       <span className="text-3xl">👨‍🏫</span>
                                       <div>
-                                        <span className="text-purple-600 text-xs font-medium uppercase tracking-wide">Instructor</span>
+                                        <div className="flex items-center gap-1">
+                                          <span className="text-purple-600 text-xs font-medium uppercase tracking-wide">Instructor</span>
+                                          <span className="text-yellow-500 text-xs">★ {formatRating(classData.tutor?.rating_star, classData.tutor?.rating_count)}</span>
+                                        </div>
                                         <p className="font-bold text-gray-900 text-base">{classData.tutor_name}</p>
                                       </div>
                                     </div>

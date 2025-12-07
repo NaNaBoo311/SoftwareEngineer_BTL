@@ -16,6 +16,7 @@ class ScheduleService {
                 period,
                 weeks,
                 room,
+                class_mode,
                 created_at
             `)
             .eq("class_id", classId)
@@ -145,6 +146,84 @@ class ScheduleService {
      * Helper to format weeks array into a readable range
      * @private
      */
+    // --- MAKEUP SCHEDULE METHODS ---
+
+    /**
+     * Get makeup schedules for a specific class
+     */
+    async getMakeupSchedules(classId) {
+        const { data, error } = await supabase
+            .from("schedule_makeup")
+            .select("*")
+            .eq("class_id", classId);
+
+        if (error) throw error;
+        return data || [];
+    }
+
+    /**
+     * Add a record to schedule_makeup (type='added' or 'removed')
+     * This effectively "saves" the makeup change.
+     */
+    async addMakeupSchedule(classId, scheduleData) {
+        // scheduleData: { week, day, period, type, room, class_mode }
+        const { data, error } = await supabase
+            .from("schedule_makeup")
+            .insert({
+                class_id: classId,
+                ...scheduleData
+            })
+            .select()
+            .single();
+
+        if (error) throw error;
+        return data;
+    }
+
+    /**
+     * Delete a record from schedule_makeup by its properties (undoing a change)
+     * Used when user clicks on a 'Yellow' slot (delete added) or 'Gray' slot (restore removed)
+     */
+    async removeMakeupSchedule(classId, week, day, period) {
+        // We delete ANY makeup record for this specific slot
+        const { error } = await supabase
+            .from("schedule_makeup")
+            .delete()
+            .eq("class_id", classId)
+            .eq("week", week)
+            .eq("day", day)
+            .eq("period", period);
+
+        if (error) throw error;
+    }
+
+    /**
+     * Get all makeup schedules for classes taught by a specific tutor
+     * Used for conflict detection across classes
+     */
+    async getMakeupSchedulesByTutor(tutorId) {
+        // First get all classes by this tutor
+        const { data: classes, error: classError } = await supabase
+            .from("classes")
+            .select("id")
+            .eq("tutor_id", tutorId);
+
+        if (classError) throw classError;
+
+        const classIds = classes.map(c => c.id);
+
+        if (classIds.length === 0) return [];
+
+        // Then get makeup schedules for these classes
+        const { data, error } = await supabase
+            .from("schedule_makeup")
+            .select("*")
+            .in("class_id", classIds);
+
+        if (error) throw error;
+        return data || [];
+    }
+
     _formatWeeksRange(weeks) {
         if (weeks.length === 0) return "";
         if (weeks.length === 1) return weeks[0];

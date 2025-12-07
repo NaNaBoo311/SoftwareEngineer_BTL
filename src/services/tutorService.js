@@ -7,7 +7,9 @@ class TutorService {
     password,
     tutorCode,
     faculty,
-    title
+    title,
+    teachingYear = 0,
+    ratingStar = 0
   ) {
     // Step 1: Register the user in Supabase Auth
     const { data: signUpData, error: signUpError } = await supabase.auth.signUp(
@@ -45,6 +47,8 @@ class TutorService {
         tutor_code: tutorCode,
         faculty: faculty,
         title: title,
+        teaching_year: teachingYear,
+        rating_star: ratingStar,
       });
 
     if (tutorError) throw tutorError;
@@ -66,7 +70,7 @@ class TutorService {
     return data;
   }
 
- async getTutorSchedules(tutorId) {
+  async getTutorSchedules(tutorId) {
     const { data, error } = await supabase
       .from("schedules")
       .select(`
@@ -76,7 +80,7 @@ class TutorService {
         weeks,
         room,
         created_at,
-        class:class_id (
+        class:class_id!inner (
           id,
           class_code,
           tutor_name,
@@ -92,19 +96,19 @@ class TutorService {
         )
       `)
       .eq("class.tutor_id", tutorId);
-  
+
     if (error) {
       console.error("Error fetching tutor schedules:", error);
       return [];
     }
-  
+
     return data;
   }
-  
- async getTutorEnrollments(tutorId) {
-  const { data, error } = await supabase
-    .from('classes')
-    .select(`
+
+  async getTutorEnrollments(tutorId) {
+    const { data, error } = await supabase
+      .from('classes')
+      .select(`
       id,
       class_code,
       current_students,
@@ -116,16 +120,16 @@ class TutorService {
         status
       )
     `)
-    .eq('tutor_id', tutorId)
-    .order('created_at', { ascending: false });
+      .eq('tutor_id', tutorId)
+      .order('created_at', { ascending: false });
 
-  if (error) {
-    console.error('Error fetching tutor enrollments:', error);
-    throw error;
+    if (error) {
+      console.error('Error fetching tutor enrollments:', error);
+      throw error;
+    }
+
+    return data;
   }
-
-  return data;
-}
 
 
 

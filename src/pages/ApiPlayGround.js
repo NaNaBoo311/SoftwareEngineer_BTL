@@ -24,6 +24,8 @@ export default function ApiPlayground() {
           "studentCode",
           "major",
           "faculty",
+          "academicYear",
+          "gpa"
         ],
         handler: async (params) =>
           await studentService.insertStudent(
@@ -32,7 +34,9 @@ export default function ApiPlayground() {
             params.password,
             params.studentCode,
             params.major,
-            params.faculty
+            params.faculty,
+            params.academicYear,
+            params.gpa
           ),
       },
       {
@@ -82,6 +86,8 @@ export default function ApiPlayground() {
           "tutorCode",
           "faculty",
           "title",
+          "teachingYear",
+          "ratingStar",
         ],
         handler: async (params) =>
           tutorService.insertTutor(
@@ -90,7 +96,9 @@ export default function ApiPlayground() {
             params.password,
             params.tutorCode,
             params.faculty,
-            params.title
+            params.title,
+            params.teachingYear,
+            params.ratingStar
           ),
       },
       {
@@ -170,7 +178,7 @@ export default function ApiPlayground() {
             params.description,
             params.faculty,
             params.maxStudents,
-            params.numClasses, 
+            params.numClasses,
             params.periodPerWeek,
             params.numberOfWeek,
           ),
@@ -256,11 +264,10 @@ export default function ApiPlayground() {
                   setError(null);
                 }
               }}
-              className={`w-full text-left font-semibold text-lg px-3 py-2 rounded-md transition ${
-                selectedCategory === category
-                  ? "bg-blue-800"
-                  : "hover:bg-blue-700"
-              }`}
+              className={`w-full text-left font-semibold text-lg px-3 py-2 rounded-md transition ${selectedCategory === category
+                ? "bg-blue-800"
+                : "hover:bg-blue-700"
+                }`}
             >
               {category}
             </button>
@@ -277,11 +284,10 @@ export default function ApiPlayground() {
                       setResult(null);
                       setError(null);
                     }}
-                    className={`block w-full text-left px-3 py-1.5 rounded-md text-sm ${
-                      selectedApi === api.name
-                        ? "bg-blue-900"
-                        : "hover:bg-blue-800"
-                    }`}
+                    className={`block w-full text-left px-3 py-1.5 rounded-md text-sm ${selectedApi === api.name
+                      ? "bg-blue-900"
+                      : "hover:bg-blue-800"
+                      }`}
                   >
                     {api.name}
                   </button>

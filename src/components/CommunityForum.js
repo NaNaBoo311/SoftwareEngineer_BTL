@@ -1,186 +1,133 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useUser } from '../context/UserContext';
+import { forumService } from '../services/forumService';
+import { formatDistanceToNow } from 'date-fns';
 
-const CommunityForum = ({ courseTitle }) => {
-  const [posts, setPosts] = useState([
-    {
-      id: 1,
-      title: 'Question about Graph Theory in Chapter 5',
-      content: 'I\'m having trouble understanding how to apply Dijkstra\'s algorithm in the practice problems. Can someone explain step by step?',
-      author: 'Nguyễn Văn A',
-      authorRole: 'student',
-      timestamp: '2 hours ago',
-      replies: 3,
-      views: 45,
-      category: 'Question',
-      tags: ['graph-theory', 'algorithm'],
-      isPinned: false,
-      repliesList: [
-        {
-          id: 1,
-          content: 'Dijkstra\'s algorithm is great for finding shortest paths. Start by marking the starting node with distance 0, then iteratively visit adjacent nodes...',
-          author: 'Trần Tuấn Anh',
-          authorRole: 'tutor',
-          timestamp: '1 hour ago',
-          isVerified: true
-        },
-        {
-          id: 2,
-          content: 'Thanks! That helps a lot. I think I understand now.',
-          author: 'Lê Thị B',
-          authorRole: 'student',
-          timestamp: '30 minutes ago',
-          isVerified: false
-        },
-        {
-          id: 3,
-          content: 'You can also check the slides from week 5, they have good examples.',
-          author: 'Phạm Văn C',
-          authorRole: 'student',
-          timestamp: '15 minutes ago',
-          isVerified: false
-        }
-      ]
-    },
-    {
-      id: 2,
-      title: 'Helpful Resource: Visual Guide to Trees',
-      content: 'I found this amazing visualization tool that helped me understand binary trees better. Sharing it here for everyone! Link: https://visualgo.net/en/bst',
-      author: 'Hoàng Thị D',
-      authorRole: 'student',
-      timestamp: '5 hours ago',
-      replies: 8,
-      views: 127,
-      category: 'Resource',
-      tags: ['tree', 'resources', 'visualization'],
-      isPinned: true,
-      repliesList: []
-    },
-    {
-      id: 3,
-      title: 'Announcement: Assignment 3 Deadline Extended',
-      content: 'Due to several requests, I\'m extending the deadline for Assignment 3 by 2 days. The new deadline is Friday, 11:59 PM.',
-      author: 'Trần Tuấn Anh',
-      authorRole: 'tutor',
-      timestamp: '1 day ago',
-      replies: 12,
-      views: 234,
-      category: 'Announcement',
-      tags: ['assignment', 'deadline'],
-      isPinned: true,
-      repliesList: []
-    },
-    {
-      id: 4,
-      title: 'Study Group for Final Exam',
-      content: 'Anyone interested in forming a study group for the final exam? We can meet online or on campus.',
-      author: 'Đỗ Văn E',
-      authorRole: 'student',
-      timestamp: '2 days ago',
-      replies: 5,
-      views: 89,
-      category: 'Discussion',
-      tags: ['study-group', 'exam'],
-      isPinned: false,
-      repliesList: []
-    }
-  ]);
-
-  const [selectedPost, setSelectedPost] = useState(null);
-  const [showCreateModal, setShowCreateModal] = useState(false);
+const CommunityForum = ({ courseTitle, classId }) => {
+  const { user } = useUser();
+  const [topics, setTopics] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
+
+  // Detail View State
+  const [selectedTopic, setSelectedTopic] = useState(null);
+  const [replies, setReplies] = useState([]);
+  const [loadingReplies, setLoadingReplies] = useState(false);
   const [replyContent, setReplyContent] = useState('');
-  const [newPost, setNewPost] = useState({
+
+  // Create Modal State
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [newTopic, setNewTopic] = useState({
     title: '',
     content: '',
     category: 'Discussion',
     tags: ''
   });
 
-  // Get current user (mock - in real app, get from context/auth)
-  const currentUser = {
-    name: 'Nguyễn Văn F',
-    role: 'student'
-  };
-
   const categories = ['All', 'Question', 'Discussion', 'Resource', 'Announcement'];
 
-  const filteredPosts = posts.filter(post => {
-    const matchesSearch = post.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         post.content.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         post.tags.some(tag => tag.toLowerCase().includes(searchQuery.toLowerCase()));
-    const matchesCategory = selectedCategory === 'All' || post.category === selectedCategory;
-    return matchesSearch && matchesCategory;
-  });
+  useEffect(() => {
+    if (classId) {
+      fetchTopics();
+    }
+  }, [classId, selectedCategory, searchQuery]);
 
-  // Sort posts: pinned first, then by timestamp
-  const sortedPosts = [...filteredPosts].sort((a, b) => {
-    if (a.isPinned !== b.isPinned) return b.isPinned - a.isPinned;
-    return new Date(b.timestamp) - new Date(a.timestamp);
-  });
-
-  const handleCreatePost = () => {
-    if (!newPost.title.trim() || !newPost.content.trim()) return;
-
-    const post = {
-      id: posts.length + 1,
-      title: newPost.title,
-      content: newPost.content,
-      author: currentUser.name,
-      authorRole: currentUser.role,
-      timestamp: 'Just now',
-      replies: 0,
-      views: 0,
-      category: newPost.category,
-      tags: newPost.tags.split(',').map(t => t.trim()).filter(t => t),
-      isPinned: false,
-      repliesList: []
-    };
-
-    setPosts([post, ...posts]);
-    setNewPost({ title: '', content: '', category: 'Discussion', tags: '' });
-    setShowCreateModal(false);
+  const fetchTopics = async () => {
+    try {
+      setLoading(true);
+      const data = await forumService.getTopics(classId, selectedCategory, searchQuery);
+      setTopics(data);
+    } catch (err) {
+      console.error("Failed to fetch topics:", err);
+      setError("Failed to load discussions.");
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleReply = (postId) => {
-    if (!replyContent.trim()) return;
-
-    const reply = {
-      id: Date.now(),
-      content: replyContent,
-      author: currentUser.name,
-      authorRole: currentUser.role,
-      timestamp: 'Just now',
-      isVerified: false
-    };
-
-    setPosts(posts.map(post => {
-      if (post.id === postId) {
-        return {
-          ...post,
-          replies: post.replies + 1,
-          repliesList: [...post.repliesList, reply]
-        };
-      }
-      return post;
-    }));
-
-    setReplyContent('');
-    // Keep the post expanded to show the new reply
+  const handleTopicClick = async (topic) => {
+    setSelectedTopic(topic);
+    setLoadingReplies(true);
+    try {
+      await forumService.incrementViews(topic.id);
+      const data = await forumService.getReplies(topic.id);
+      setReplies(data);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoadingReplies(false);
+    }
   };
 
-  const formatTimestamp = (timestamp) => {
-    return timestamp;
+  const handleCreateTopic = async () => {
+    if (!newTopic.title.trim() || !newTopic.content.trim()) return;
+
+    try {
+      const topicData = {
+        class_id: classId,
+        user_id: user?.id, // Use the proper User ID, not the Student/Tutor ID
+        title: newTopic.title,
+        content: newTopic.content,
+        category: newTopic.category,
+        tags: newTopic.tags.split(',').map(t => t.trim()).filter(t => t),
+        is_pinned: false // Only tutors can pin? Logic for another time
+      };
+
+      await forumService.createTopic(topicData);
+
+      setShowCreateModal(false);
+      setNewTopic({ title: '', content: '', category: 'Discussion', tags: '' });
+      fetchTopics(); // Refresh list
+    } catch (err) {
+      console.error(err);
+      alert("Failed to create post");
+    }
   };
 
-  if (selectedPost) {
-    const post = posts.find(p => p.id === selectedPost);
+  const handleReply = async () => {
+    if (!replyContent.trim() || !selectedTopic) return;
+
+    try {
+      const replyData = {
+        topic_id: selectedTopic.id,
+        user_id: user?.id,
+        content: replyContent
+      };
+
+      await forumService.createReply(replyData);
+
+      setReplyContent('');
+      // Refresh replies
+      const updatedReplies = await forumService.getReplies(selectedTopic.id);
+      setReplies(updatedReplies);
+
+      // Update reply count in list view locally or refetch
+      const updatedTopics = topics.map(t =>
+        t.id === selectedTopic.id ? { ...t, repliesCount: t.repliesCount + 1 } : t
+      );
+      setTopics(updatedTopics);
+
+    } catch (err) {
+      console.error(err);
+      alert("Failed to post reply");
+    }
+  };
+
+  const formatTime = (dateString) => {
+    if (!dateString) return '';
+    return formatDistanceToNow(new Date(dateString), { addSuffix: true });
+  };
+
+  // --- Render Detail View ---
+  if (selectedTopic) {
     return (
       <div className="bg-white rounded-xl border border-gray-200 shadow-sm">
         {/* Post Header */}
         <div className="p-6 border-b border-gray-200">
           <button
-            onClick={() => setSelectedPost(null)}
+            onClick={() => { setSelectedTopic(null); setReplies([]); }}
             className="text-blue-600 hover:text-blue-700 font-medium mb-4 flex items-center gap-2"
           >
             ← Back to discussions
@@ -188,41 +135,40 @@ const CommunityForum = ({ courseTitle }) => {
           <div className="flex items-start justify-between">
             <div className="flex-1">
               <div className="flex items-center gap-3 mb-2">
-                {post.isPinned && (
+                {selectedTopic.is_pinned && (
                   <span className="px-2 py-1 bg-yellow-100 text-yellow-700 text-xs font-medium rounded">📌 Pinned</span>
                 )}
-                <span className="px-2 py-1 bg-blue-100 text-blue-700 text-xs font-medium rounded">{post.category}</span>
+                <span className="px-2 py-1 bg-blue-100 text-blue-700 text-xs font-medium rounded">{selectedTopic.category}</span>
               </div>
-              <h2 className="text-2xl font-bold text-gray-900 mb-3">{post.title}</h2>
+              <h2 className="text-2xl font-bold text-gray-900 mb-3">{selectedTopic.title}</h2>
               <div className="flex items-center gap-4 text-sm text-gray-600">
                 <div className="flex items-center gap-2">
-                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold ${
-                    post.authorRole === 'tutor' ? 'bg-indigo-600' : 'bg-blue-600'
-                  }`}>
-                    {post.author.charAt(0)}
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold ${selectedTopic.authorRole === 'tutor' || selectedTopic.authorRole === 'admin' ? 'bg-indigo-600' : 'bg-blue-600'
+                    }`}>
+                    {selectedTopic.authorName?.charAt(0)}
                   </div>
                   <div>
-                    <div className="font-medium text-gray-900">{post.author}</div>
+                    <div className="font-medium text-gray-900">{selectedTopic.authorName}</div>
                     <div className="text-xs text-gray-500">
-                      {post.authorRole === 'tutor' ? 'Tutor' : 'Student'} • {post.timestamp}
+                      {selectedTopic.authorRole === 'tutor' ? 'Tutor' : 'Student'} • {formatTime(selectedTopic.created_at)}
                     </div>
                   </div>
                 </div>
               </div>
             </div>
             <div className="text-right text-sm text-gray-500">
-              <div>{post.views} views</div>
-              <div>{post.replies} replies</div>
+              <div>{selectedTopic.views} views</div>
+              <div>{replies.length} replies</div>
             </div>
           </div>
         </div>
 
         {/* Post Content */}
         <div className="p-6 border-b border-gray-200">
-          <div className="prose max-w-none text-gray-700 whitespace-pre-wrap">{post.content}</div>
-          {post.tags.length > 0 && (
+          <div className="prose max-w-none text-gray-700 whitespace-pre-wrap">{selectedTopic.content}</div>
+          {selectedTopic.tags && selectedTopic.tags.length > 0 && (
             <div className="flex flex-wrap gap-2 mt-4">
-              {post.tags.map(tag => (
+              {selectedTopic.tags.map(tag => (
                 <span key={tag} className="px-2 py-1 bg-gray-100 text-gray-700 text-xs rounded">
                   #{tag}
                 </span>
@@ -234,33 +180,38 @@ const CommunityForum = ({ courseTitle }) => {
         {/* Replies */}
         <div className="p-6">
           <h3 className="text-lg font-semibold text-gray-900 mb-4">
-            {post.repliesList.length} {post.repliesList.length === 1 ? 'Reply' : 'Replies'}
+            {replies.length} {replies.length === 1 ? 'Reply' : 'Replies'}
           </h3>
 
           <div className="space-y-4 mb-6">
-            {post.repliesList.map(reply => (
-              <div key={reply.id} className="border border-gray-200 rounded-lg p-4">
-                <div className="flex items-start gap-3">
-                  <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0 ${
-                    reply.authorRole === 'tutor' ? 'bg-indigo-600' : 'bg-blue-600'
-                  }`}>
-                    {reply.author.charAt(0)}
-                  </div>
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="font-medium text-gray-900">{reply.author}</span>
-                      {reply.authorRole === 'tutor' && (
-                        <span className="px-2 py-0.5 bg-indigo-100 text-indigo-700 text-xs font-medium rounded">
-                          Tutor
-                        </span>
-                      )}
-                      <span className="text-xs text-gray-500">{reply.timestamp}</span>
+            {loadingReplies ? (
+              <div className="text-center text-gray-500">Loading replies...</div>
+            ) : replies.length === 0 ? (
+              <div className="text-gray-500 italic">No replies yet. Be the first to start the conversation!</div>
+            ) : (
+              replies.map(reply => (
+                <div key={reply.id} className="border border-gray-200 rounded-lg p-4">
+                  <div className="flex items-start gap-3">
+                    <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0 ${reply.authorRole === 'tutor' ? 'bg-indigo-600' : 'bg-blue-600'
+                      }`}>
+                      {reply.authorName?.charAt(0)}
                     </div>
-                    <div className="text-gray-700 whitespace-pre-wrap">{reply.content}</div>
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="font-medium text-gray-900">{reply.authorName}</span>
+                        {reply.authorRole === 'tutor' && (
+                          <span className="px-2 py-0.5 bg-indigo-100 text-indigo-700 text-xs font-medium rounded">
+                            Tutor
+                          </span>
+                        )}
+                        <span className="text-xs text-gray-500">{formatTime(reply.created_at)}</span>
+                      </div>
+                      <div className="text-gray-700 whitespace-pre-wrap">{reply.content}</div>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              ))
+            )}
           </div>
 
           {/* Reply Form */}
@@ -274,7 +225,7 @@ const CommunityForum = ({ courseTitle }) => {
             />
             <div className="flex justify-end mt-3">
               <button
-                onClick={() => handleReply(post.id)}
+                onClick={handleReply}
                 disabled={!replyContent.trim()}
                 className="px-6 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
               >
@@ -287,6 +238,7 @@ const CommunityForum = ({ courseTitle }) => {
     );
   }
 
+  // --- List View ---
   return (
     <div className="space-y-6">
       {/* Header with Search and Create */}
@@ -314,14 +266,7 @@ const CommunityForum = ({ courseTitle }) => {
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full px-4 py-3 pl-10 text-base border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             />
-            <svg
-              className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-            </svg>
+            <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">🔍</span>
           </div>
           <select
             value={selectedCategory}
@@ -335,52 +280,53 @@ const CommunityForum = ({ courseTitle }) => {
         </div>
       </div>
 
-      {/* Posts List */}
+      {/* Topics List */}
       <div className="space-y-4">
-        {sortedPosts.length === 0 ? (
+        {loading ? (
+          <div className="text-center py-12">Loading discussions...</div>
+        ) : topics.length === 0 ? (
           <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-12 text-center">
             <div className="text-6xl mb-4">💬</div>
             <p className="text-lg text-gray-600 font-medium">No discussions found</p>
-            <p className="text-sm text-gray-500 mt-2">Try adjusting your search or filters</p>
+            <p className="text-sm text-gray-500 mt-2">Try adjusting your search or filters, or create a new post.</p>
           </div>
         ) : (
-          sortedPosts.map(post => (
+          topics.map(topic => (
             <div
-              key={post.id}
-              onClick={() => setSelectedPost(post.id)}
+              key={topic.id}
+              onClick={() => handleTopicClick(topic)}
               className="bg-white rounded-xl border border-gray-200 shadow-sm p-6 hover:border-blue-300 hover:shadow-md transition-all cursor-pointer"
             >
               <div className="flex items-start gap-4">
-                <div className={`w-12 h-12 rounded-full flex items-center justify-center text-white font-bold flex-shrink-0 ${
-                  post.authorRole === 'tutor' ? 'bg-indigo-600' : 'bg-blue-600'
-                }`}>
-                  {post.author.charAt(0)}
+                <div className={`w-12 h-12 rounded-full flex items-center justify-center text-white font-bold flex-shrink-0 ${topic.authorRole === 'tutor' ? 'bg-indigo-600' : 'bg-blue-600'
+                  }`}>
+                  {topic.authorName ? topic.authorName.charAt(0) : '?'}
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-3 mb-2">
-                    {post.isPinned && (
+                    {topic.is_pinned && (
                       <span className="text-yellow-600 text-sm">📌</span>
                     )}
                     <span className="px-2 py-1 bg-blue-100 text-blue-700 text-xs font-medium rounded">
-                      {post.category}
+                      {topic.category}
                     </span>
                   </div>
                   <h3 className="text-lg font-semibold text-gray-900 mb-2 hover:text-blue-700">
-                    {post.title}
+                    {topic.title}
                   </h3>
-                  <p className="text-gray-600 mb-3 line-clamp-2">{post.content}</p>
+                  <p className="text-gray-600 mb-3 line-clamp-2">{topic.content}</p>
                   <div className="flex items-center gap-4 text-sm text-gray-500">
-                    <span className="font-medium text-gray-700">{post.author}</span>
+                    <span className="font-medium text-gray-700">{topic.authorName}</span>
                     <span>•</span>
-                    <span>{post.authorRole === 'tutor' && '👨‍🏫 '} {post.timestamp}</span>
+                    <span>{topic.authorRole === 'tutor' && '👨‍🏫 '} {formatTime(topic.created_at)}</span>
                     <span>•</span>
-                    <span>{post.replies} replies</span>
+                    <span>{topic.repliesCount} replies</span>
                     <span>•</span>
-                    <span>{post.views} views</span>
+                    <span>{topic.views} views</span>
                   </div>
-                  {post.tags.length > 0 && (
+                  {topic.tags && topic.tags.length > 0 && (
                     <div className="flex flex-wrap gap-2 mt-3">
-                      {post.tags.map(tag => (
+                      {topic.tags.map(tag => (
                         <span key={tag} className="px-2 py-1 bg-gray-100 text-gray-700 text-xs rounded">
                           #{tag}
                         </span>
@@ -420,8 +366,8 @@ const CommunityForum = ({ courseTitle }) => {
                 <label className="block text-sm font-medium text-gray-700 mb-2">Title</label>
                 <input
                   type="text"
-                  value={newPost.title}
-                  onChange={(e) => setNewPost({ ...newPost, title: e.target.value })}
+                  value={newTopic.title}
+                  onChange={(e) => setNewTopic({ ...newTopic, title: e.target.value })}
                   placeholder="Enter post title..."
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-base"
                 />
@@ -429,8 +375,8 @@ const CommunityForum = ({ courseTitle }) => {
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Category</label>
                 <select
-                  value={newPost.category}
-                  onChange={(e) => setNewPost({ ...newPost, category: e.target.value })}
+                  value={newTopic.category}
+                  onChange={(e) => setNewTopic({ ...newTopic, category: e.target.value })}
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-base"
                 >
                   {categories.filter(c => c !== 'All').map(cat => (
@@ -441,8 +387,8 @@ const CommunityForum = ({ courseTitle }) => {
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Content</label>
                 <textarea
-                  value={newPost.content}
-                  onChange={(e) => setNewPost({ ...newPost, content: e.target.value })}
+                  value={newTopic.content}
+                  onChange={(e) => setNewTopic({ ...newTopic, content: e.target.value })}
                   placeholder="Write your post content..."
                   rows="6"
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-base"
@@ -452,8 +398,8 @@ const CommunityForum = ({ courseTitle }) => {
                 <label className="block text-sm font-medium text-gray-700 mb-2">Tags (comma-separated)</label>
                 <input
                   type="text"
-                  value={newPost.tags}
-                  onChange={(e) => setNewPost({ ...newPost, tags: e.target.value })}
+                  value={newTopic.tags}
+                  onChange={(e) => setNewTopic({ ...newTopic, tags: e.target.value })}
                   placeholder="e.g., graph-theory, algorithm, help"
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-base"
                 />
@@ -467,8 +413,8 @@ const CommunityForum = ({ courseTitle }) => {
                 Cancel
               </button>
               <button
-                onClick={handleCreatePost}
-                disabled={!newPost.title.trim() || !newPost.content.trim()}
+                onClick={handleCreateTopic}
+                disabled={!newTopic.title.trim() || !newTopic.content.trim()}
                 className="px-6 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
               >
                 Create Post
