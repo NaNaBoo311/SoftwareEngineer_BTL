@@ -137,7 +137,8 @@ class ClassService {
           start_week,
           end_week,
           number_of_week
-        )
+        ),
+        schedules (*)
       `)
       .eq("id", classId)
       .single();
@@ -160,6 +161,7 @@ class ClassService {
         end_week: data.programs.end_week,
         number_of_week: data.programs.number_of_week,
       } : null,
+      schedules: data.schedules || [],
     };
   }
 }

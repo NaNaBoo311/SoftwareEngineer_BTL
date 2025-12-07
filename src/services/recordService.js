@@ -40,14 +40,17 @@ export const recordService = {
     async getAttendance(studentId, classId) {
         const { data, error } = await supabase
             .from('course_attendance')
-            .select('attended_weeks')
+            .select('attended_weeks, attended_slots')
             .eq('student_id', studentId)
             .eq('class_id', classId)
             .single();
 
-        // Return empty array if no record, or if attended_weeks is specifically null
+        // Return empty arrays if no record
         if (error && error.code !== 'PGRST116') throw error;
-        return data?.attended_weeks || [];
+        return {
+            attendedWeeks: data?.attended_weeks || [],
+            attendedSlots: data?.attended_slots || []
+        };
     },
 
     /**
@@ -76,17 +79,38 @@ export const recordService = {
      * @param {number} classId
      * @param {number[]} attendedWeeks - Array of week numbers
      */
-    async saveAttendance(studentId, classId, attendedWeeks) {
+    async saveAttendance(studentId, classId, attendedWeeks, attendedSlots) {
         const { data, error } = await supabase
             .from('course_attendance')
             .upsert({
                 student_id: studentId,
                 class_id: classId,
-                attended_weeks: attendedWeeks, // Save array
+                attended_weeks: attendedWeeks,
+                attended_slots: attendedSlots,
                 updated_at: new Date().toISOString()
             }, { onConflict: 'class_id, student_id' })
             .select()
             .single();
+
+        if (error) throw error;
+        return data;
+    },
+
+    /**
+     * Batch save attendance for multiple students
+     * @param {Array} attendanceRecords - Array of objects { student_id, class_id, attended_weeks, attended_slots }
+     */
+    async saveBulkAttendance(attendanceRecords) {
+        const { data, error } = await supabase
+            .from('course_attendance')
+            .upsert(
+                attendanceRecords.map(r => ({
+                    ...r,
+                    updated_at: new Date().toISOString()
+                })),
+                { onConflict: 'class_id, student_id' }
+            )
+            .select();
 
         if (error) throw error;
         return data;
@@ -114,6 +138,35 @@ export const recordService = {
             .from('course_assessments')
             .insert(records)
             .select();
+
+        if (error) throw error;
+        return data;
+    },
+
+    /**
+     * Get all grades for a class
+     */
+    async getClassGrades(classId) {
+        const { data, error } = await supabase
+            .from('student_grades')
+            .select(`
+                *,
+                course_assessments!inner(class_id, weight, max_score, id)
+            `)
+            .eq('course_assessments.class_id', classId);
+
+        if (error) throw error;
+        return data;
+    },
+
+    /**
+     * Get all attendance for a class
+     */
+    async getClassAttendance(classId) {
+        const { data, error } = await supabase
+            .from('course_attendance')
+            .select('*')
+            .eq('class_id', classId);
 
         if (error) throw error;
         return data;
