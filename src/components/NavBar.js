@@ -48,6 +48,9 @@ export default function Navbar() {
             <Link to="/student-register" className="hover:text-gray-300">
               Register
             </Link>
+            <Link to="/student-schedule" className="hover:text-gray-300">
+              Schedule
+            </Link>
             {/* <Link to="/support" className="hover:text-gray-300">
               Support
             </Link> */}

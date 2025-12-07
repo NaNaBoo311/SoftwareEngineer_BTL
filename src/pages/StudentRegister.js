@@ -325,7 +325,59 @@ export default function StudentRegister() {
     );
   };
 
-  // Auto Match - randomly select an available class and enroll
+  // Calculate match score between student and tutor/class
+  const calculateMatchScore = (studentProfile, tutorData) => {
+    // Default values if data is missing
+    const studentFaculty = studentProfile?.faculty || "";
+    const studentGPA = studentProfile?.gpa || 0;
+    const studentAcademicYear = studentProfile?.academic_year || 1;
+
+    const tutorFaculty = tutorData?.faculty || "";
+    const tutorTeachingYear = tutorData?.teaching_year || 0;
+    const tutorRating = tutorData?.rating_star || 0;
+
+    // 1. faculty_match
+    const faculty_match = studentFaculty === tutorFaculty ? 1.0 : 0.0;
+
+    // 2. experience_score
+    const experience_score = Math.min(tutorTeachingYear, 20) / 20;
+
+    // 3. rating_score
+    const rating_score = Math.min(tutorRating, 5) / 5;
+
+    // 4. gpa_difficulty
+    const gpa_norm = studentGPA / 4;
+    const gpa_difficulty = 1 - gpa_norm;
+
+    // 5. academic_year_norm
+    const clampedYear = Math.max(0, Math.min(3, studentAcademicYear - 1));
+    const academic_year_norm = clampedYear / 3;
+
+    // Logistic Regression weights learned from training
+    const b = 1.17720421;
+    const w1 = 0.82373155; // faculty_match
+    const w2 = 1.33624093; // experience_score
+    const w3 = 0.51297459; // rating_score
+    const w4 = 0.15655953; // gpa_difficulty
+    const w5 = 0.14506848; // academic_year_norm
+
+    // compute raw score
+    const raw =
+      // b +
+      w1 * faculty_match +
+      w2 * experience_score +
+      w3 * rating_score +
+      w4 * gpa_difficulty +
+      w5 * academic_year_norm;
+
+    // sigmoid function
+    const sigmoid = (x) => 1 / (1 + Math.exp(-x));
+
+    // final match score between 0 and 1
+    return sigmoid(raw);
+  };
+
+  // Auto Match - calculate match scores and show top 5 classes
   const handleAutoMatch = async (program) => {
     if (!user || !user.details?.id) {
       showNotification("You must be logged in to use Auto Match.", "warning", "Login Required");
@@ -362,25 +414,57 @@ export default function StudentRegister() {
       return;
     }
 
-    // Randomly select a class
-    const randomIndex = Math.floor(Math.random() * availableClasses.length);
-    const selectedClass = availableClasses[randomIndex];
+    // Get student profile from user.details
+    const studentProfile = {
+      faculty: user.details?.faculty || "",
+      gpa: user.details?.gpa || 0,
+      academic_year: user.details?.academic_year || 1,
+    };
 
-    // Show confirmation modal
+    // Calculate match scores for all available classes
+    const classesWithScores = availableClasses.map(classData => {
+      const tutorData = classData.tutor || null;
+      const matchScore = calculateMatchScore(studentProfile, tutorData);
+
+      return {
+        ...classData,
+        matchScore: matchScore,
+        matchPercentage: Math.round(matchScore * 100),
+      };
+    });
+
+    // Sort by match score (descending) and take top 5
+    const topClasses = classesWithScores
+      .sort((a, b) => b.matchScore - a.matchScore)
+      .slice(0, 5);
+
+    // Debug logging
+    console.log("Student Profile:", studentProfile);
+    console.log("Classes with Scores:", classesWithScores);
+    console.log("Top 5 Matches:", topClasses);
+
+    // Build message for confirmation modal with top 5 classes
+    const classListMessage = topClasses.map((cls, index) =>
+      `${index + 1}. ${cls.class_code} - ${cls.tutor_name} (Match: ${cls.matchPercentage}%)`
+    ).join('\n');
+
+    const fullMessage = `Auto Match found ${topClasses.length} recommended ${topClasses.length === 1 ? 'class' : 'classes'}:\n\n${classListMessage}\n\nEnrolling in the best match: ${topClasses[0].class_code} with ${topClasses[0].tutor_name} (${topClasses[0].matchPercentage}% match)`;
+
+    // Show confirmation modal with best match
     showConfirmation(
-      `Auto Match found:\n\nClass: ${selectedClass.class_code}\nInstructor: ${selectedClass.tutor_name}\n\nDo you want to enroll in this class?`,
+      fullMessage,
       async () => {
         try {
           setRegistering(true);
 
-          // Enroll the student in the randomly selected class
+          // Enroll the student in the best matching class
           await studentService.enrollStudentInClass(
             user.details.id,
-            selectedClass.id
+            topClasses[0].id
           );
 
           showNotification(
-            `Successfully enrolled in ${selectedClass.class_code} with ${selectedClass.tutor_name}!`,
+            `Successfully enrolled in ${topClasses[0].class_code} with ${topClasses[0].tutor_name}! (${topClasses[0].matchPercentage}% match)`,
             "success",
             "Auto Match Successful"
           );

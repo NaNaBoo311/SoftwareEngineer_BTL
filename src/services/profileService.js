@@ -135,7 +135,6 @@ class ProfileService {
             .select(`
         id,
         tutor_code,
-        program,
         faculty,
         title,
         teaching_year,
@@ -211,7 +210,6 @@ class ProfileService {
         return {
             id: tutor.id,
             tutorCode: tutor.tutor_code,
-            program: tutor.program,
             faculty: tutor.faculty,
             title: tutor.title,
             teachingYear: tutor.teaching_year,
@@ -259,11 +257,11 @@ class ProfileService {
     /**
      * Update tutor profile information
      * @param {string} tutorId - The tutor ID
-     * @param {Object} updates - Fields to update (program, faculty, title, teaching_year)
+     * @param {Object} updates - Fields to update (faculty, title, teaching_year)
      * @returns {Promise<Object>} Updated tutor data
      */
     async updateTutorProfile(tutorId, updates) {
-        const allowedFields = ['program', 'faculty', 'title', 'teaching_year'];
+        const allowedFields = ['faculty', 'title', 'teaching_year'];
         const filteredUpdates = {};
 
         // Only include allowed fields

@@ -54,7 +54,6 @@ export default function ProfilePage() {
         name: profileData.user?.fullName || "",
         tutorId: profileData.tutorCode || "",
         email: profileData.user?.email || "",
-        program: profileData.program || "",
         faculty: profileData.faculty || "",
         title: profileData.title || "",
         teachingYear: profileData.teachingYear || 0,
@@ -118,7 +117,6 @@ export default function ProfilePage() {
 
         // Update tutor-specific info
         await profileService.updateTutorProfile(profileData.id, {
-          program: form.program,
           faculty: form.faculty,
           title: form.title,
           teaching_year: parseInt(form.teachingYear) || 0,
@@ -297,17 +295,6 @@ export default function ProfilePage() {
                 </div>
 
                 <div>
-                  <label className="text-sm text-gray-600">Program</label>
-                  <input
-                    name="program"
-                    value={form.program || ""}
-                    onChange={handleChange}
-                    disabled={!editing}
-                    className="mt-1 p-2 border rounded-md w-full disabled:bg-gray-100"
-                  />
-                </div>
-
-                <div>
                   <label className="text-sm text-gray-600">Title</label>
                   <input
                     name="title"
@@ -454,13 +441,6 @@ export default function ProfilePage() {
                         <div className="text-sm text-gray-600 mt-1">
                           Students: {classItem.currentStudents}/{classItem.maxStudents}
                         </div>
-                        {classItem.schedules && classItem.schedules.length > 0 && (
-                          <div className="text-sm text-gray-500 mt-1">
-                            Schedule: {classItem.schedules.map(s =>
-                              `${s.day} ${s.period}${s.room ? ` - ${s.room}` : ''}`
-                            ).join(", ")}
-                          </div>
-                        )}
                       </div>
                     ))}
                   </div>

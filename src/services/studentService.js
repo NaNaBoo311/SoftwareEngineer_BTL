@@ -93,10 +93,10 @@ class StudentService {
 
     if (studentError) throw studentError;
 
-    return { 
-      userId, 
+    return {
+      userId,
       studentId: studentData.id,
-      studentCode: studentData.student_code 
+      studentCode: studentData.student_code
     };
   }
 
@@ -183,8 +183,8 @@ class StudentService {
     // Step 4: Update the current_students count in the class
     const { error: updateError } = await supabase
       .from("classes")
-      .update({ 
-        current_students: classData.current_students + 1 
+      .update({
+        current_students: classData.current_students + 1
       })
       .eq("id", classId);
 
@@ -240,7 +240,7 @@ class StudentService {
     // Step 4: Update the current_students count in the class
     const { error: updateError } = await supabase
       .from("classes")
-      .update({ 
+      .update({
         current_students: Math.max(0, classData.current_students - 1)
       })
       .eq("id", classId);
@@ -303,6 +303,48 @@ class StudentService {
     });
 
     return formatted;
+  }
+  async getStudentWeeklySchedule(studentId) {
+    const { data, error } = await supabase
+      .from("student_classes")
+      .select(`
+        classes (
+          id,
+          class_code,
+          tutor_name,
+          programs (
+            name
+          ),
+          schedules (
+            day,
+            period,
+            weeks,
+            room
+          )
+        )
+      `)
+      .eq("student_id", studentId);
+
+    if (error) throw error;
+
+    // Flatten the result to a list of schedule items
+    const scheduleItems = [];
+    data.forEach(enrollment => {
+      const classInfo = enrollment.classes;
+      if (classInfo && classInfo.schedules) {
+        classInfo.schedules.forEach(schedule => {
+          scheduleItems.push({
+            ...schedule,
+            class_code: classInfo.class_code,
+            tutor_name: classInfo.tutor_name,
+            program_name: classInfo.programs?.name || "Unknown Program",
+            class_id: classInfo.id
+          });
+        });
+      }
+    });
+
+    return scheduleItems;
   }
 }
 

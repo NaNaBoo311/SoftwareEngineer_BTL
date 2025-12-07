@@ -28,9 +28,9 @@ class ProgramService {
       ])
       .select()
       .single();
-  
+
     if (programError) throw programError;
-  
+
     // Step 2: Create corresponding classes
     const classesToInsert = [];
     for (let i = 1; i <= numClasses; i++) {
@@ -41,20 +41,20 @@ class ProgramService {
         max_students: maxStudents,
       });
     }
-  
+
     const { error: classError } = await supabase
       .from("classes")
       .insert(classesToInsert);
-  
+
     if (classError) throw classError;
-  
+
     // Step 3: Return the created program with its classes
     return {
       ...program,
       classes: classesToInsert,
     };
   }
-  
+
   async getAllPrograms() {
     const { data, error } = await supabase
       .from("programs")
@@ -94,6 +94,7 @@ class ProgramService {
           id,
           class_code,
           tutor_name,
+          tutor_id,
           max_students,
           current_students,
           schedules (
@@ -102,41 +103,47 @@ class ProgramService {
             period,
             weeks,
             room
+          ),
+          tutors:tutor_id (
+            faculty,
+            teaching_year,
+            rating_star
           )
         )
       `)
       .eq("status", "active") // only active programs
       .order("id", { ascending: true });
-  
+
     console.log("Data", data);
     if (error) throw error;
-  
+
     return data.map((program) => ({
       ...program,
       classes: (program.classes || []).map((cls) => ({
         ...cls,
         schedule: cls.schedules || [],
+        tutor: cls.tutors || null, // Include tutor details
       })),
     }));
   }
-  
+
   async getProgramsWithClasses() {
     // Fetch all programs
     const { data: programs, error: programError } = await supabase
       .from('programs')
       .select('*')
       .order('id', { ascending: true });
-  
+
     if (programError) throw programError;
-  
+
     // Fetch all classes with tutor_id
     const { data: classes, error: classError } = await supabase
       .from('classes')
       .select('*')
       .order('id', { ascending: true });
-  
+
     if (classError) throw classError;
-  
+
     // Merge programs with their related classes
     const formatted = programs.map((program) => {
       const relatedClasses = classes
@@ -149,7 +156,7 @@ class ProgramService {
           //  Available if no tutor is assigned
           available: !cls.tutor_name || cls.tutor_name.trim() === '',
         }));
-  
+
       return {
         id: program.id,
         name: program.name,
@@ -163,35 +170,35 @@ class ProgramService {
         classes: relatedClasses,
       };
     });
-  
+
     return formatted;
   }
-  
+
   async getTakenSchedules() {
     // 1️ Fetch classes
     const { data: classes, error: classError } = await supabase
       .from('classes')
       .select('id, class_code, tutor_name');
-  
+
     if (classError) throw classError;
-  
+
     // 2️ Fetch schedules
     const { data: schedules, error: scheduleError } = await supabase
       .from('schedules')
       .select('class_id, day, period, weeks, room');
-  
+
     if (scheduleError) throw scheduleError;
-  
+
     // 3️ Build a map of class_id → class info
     const classMap = Object.fromEntries(classes.map((cls) => [cls.id, cls]));
-  
+
     // 4️ Group schedules by class
     const grouped = {};
-  
+
     schedules.forEach((sch) => {
       const cls = classMap[sch.class_id];
       if (!cls) return;
-  
+
       if (!grouped[cls.id]) {
         grouped[cls.id] = {
           class_code: cls.class_code,
@@ -199,15 +206,15 @@ class ProgramService {
           schedules: [],
         };
       }
-  
+
       grouped[cls.id].schedules.push({
-        week: parseInt(sch.weeks, 10),  
+        week: parseInt(sch.weeks, 10),
         day: parseInt(sch.day, 10),
         period: parseInt(sch.period, 10),
         room: sch.room,
       });
     });
-  
+
     // 5️ Convert to array
     return Object.values(grouped);
 
@@ -248,21 +255,21 @@ class ProgramService {
         });
       });
     }
-  
+
     // 2 Replace existing schedules
     const { error: deleteError } = await supabase
       .from('schedules')
       .delete()
       .eq('class_id', classId);
-  
+
     if (deleteError) throw deleteError;
-  
+
     const { error: insertError } = await supabase
       .from('schedules')
       .insert(newSchedules);
-  
+
     if (insertError) throw insertError;
-  
+
 
     // 3 Update class with tutor information if provided
     if (tutorInfo) {
@@ -273,37 +280,37 @@ class ProgramService {
           tutor_id: tutorInfo.id
         })
         .eq('id', classId);
-  
+
       if (classUpdateError) throw classUpdateError;
     }
-  
+
     // 4 Fetch the program_id of this class
     const { data: classData, error: classError } = await supabase
       .from('classes')
       .select('program_id')
       .eq('id', classId)
       .single();
-  
+
     if (classError) throw classError;
-  
+
     const programId = classData.program_id;
-  
+
     // 5 Check if any class under this program has a tutor
     const { data: existingTutors, error: tutorError } = await supabase
       .from('classes')
       .select('id')
       .eq('program_id', programId)
       .not('tutor_name', 'is', null);
-  
+
     if (tutorError) throw tutorError;
-  
+
     // 6 If any class has a tutor, set program.status = 'active'
     if (existingTutors.length > 0) {
       const { error: updateError } = await supabase
         .from('programs')
         .update({ status: 'active' })
         .eq('id', programId);
-  
+
       if (updateError) throw updateError;
     } else {
       // (Optional) If no tutor, revert to upcoming
@@ -311,10 +318,10 @@ class ProgramService {
         .from('programs')
         .update({ status: 'upcoming' })
         .eq('id', programId);
-  
+
       if (revertError) throw revertError;
     }
-  
+
     return { success: true };
   }
 
@@ -332,22 +339,22 @@ class ProgramService {
         });
       });
     }
-  
+
     // 2 Replace existing schedules for this class
     const { error: deleteError } = await supabase
       .from('schedules')
       .delete()
       .eq('class_id', classId);
-  
+
     if (deleteError) throw deleteError;
-  
+
     // 3 Insert new schedules
     const { error: insertError } = await supabase
       .from('schedules')
       .insert(newSchedules);
-  
+
     if (insertError) throw insertError;
-  
+
     // 4 Update class with tutor information
     const { error: classUpdateError } = await supabase
       .from('classes')
@@ -356,9 +363,9 @@ class ProgramService {
         tutor_id: tutorInfo.id
       })
       .eq('id', classId);
-  
+
     if (classUpdateError) throw classUpdateError;
-  
+
     return { success: true };
   }
 
@@ -368,9 +375,9 @@ class ProgramService {
       .from('schedules')
       .delete()
       .eq('class_id', classId);
-  
+
     if (deleteSchedulesError) throw deleteSchedulesError;
-  
+
     // 2 Clear tutor information from the class
     const { error: classUpdateError } = await supabase
       .from('classes')
@@ -379,39 +386,39 @@ class ProgramService {
         tutor_id: null
       })
       .eq('id', classId);
-  
+
     if (classUpdateError) throw classUpdateError;
-  
+
     // 3 Fetch the program_id of this class
     const { data: classData, error: classError } = await supabase
       .from('classes')
       .select('program_id')
       .eq('id', classId)
       .single();
-  
+
     if (classError) throw classError;
-  
+
     const programId = classData.program_id;
-  
+
     // 4 Check if any class under this program still has a tutor
     const { data: remainingTutors, error: tutorError } = await supabase
       .from('classes')
       .select('id')
       .eq('program_id', programId)
       .not('tutor_name', 'is', null);
-  
+
     if (tutorError) throw tutorError;
-  
+
     // 5 If no tutors remain, set program status to 'upcoming'
     if (remainingTutors.length === 0) {
       const { error: updateError } = await supabase
         .from('programs')
         .update({ status: 'upcoming' })
         .eq('id', programId);
-  
+
       if (updateError) throw updateError;
     }
-  
+
     return { success: true };
   }
 
