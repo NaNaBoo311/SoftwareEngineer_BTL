@@ -178,14 +178,14 @@ class ProgramService {
     // 1️ Fetch classes
     const { data: classes, error: classError } = await supabase
       .from('classes')
-      .select('id, class_code, tutor_name');
+      .select('id, class_code, tutor_name, tutor_id');
 
     if (classError) throw classError;
 
     // 2️ Fetch schedules
     const { data: schedules, error: scheduleError } = await supabase
       .from('schedules')
-      .select('class_id, day, period, weeks, room');
+      .select('class_id, day, period, weeks, room, class_mode');
 
     if (scheduleError) throw scheduleError;
 
@@ -203,6 +203,7 @@ class ProgramService {
         grouped[cls.id] = {
           class_code: cls.class_code,
           tutor_name: cls.tutor_name,
+          tutor_id: cls.tutor_id,
           schedules: [],
         };
       }
@@ -252,6 +253,7 @@ class ProgramService {
           day: p.day.toString(),
           period: p.period.toString(),
           room: p.room,
+          class_mode: p.class_mode || (p.room === 'Online' ? 'online' : 'offline')
         });
       });
     }
@@ -336,6 +338,7 @@ class ProgramService {
           day: p.day.toString(),
           period: p.period.toString(),
           room: p.room,
+          class_mode: p.class_mode || (p.room === 'Online' ? 'online' : 'offline')
         });
       });
     }

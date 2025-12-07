@@ -2,7 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { tutorService } from '../services/tutorService';
 import { programService } from '../services/programService';
+import NotificationModal from '../components/NotificationModal';
 import RoomSelectionModal from '../components/RoomSelectionModal';
+import ModeSelectionModal from '../components/ModeSelectionModal';
 import ProgramCard from '../components/ProgramCard';
 import ClassCard from '../components/ClassCard';
 import { useUser } from '../context/UserContext';
@@ -16,6 +18,26 @@ const TutorRegister = () => {
   const [selectedWeeks, setSelectedWeeks] = useState([]);
   const [sharedConfiguration, setSharedConfiguration] = useState({ periods: [] });
   const [showRoomModal, setShowRoomModal] = useState(false);
+  const [showModeModal, setShowModeModal] = useState(false);
+  const [notification, setNotification] = useState({
+    isOpen: false,
+    title: '',
+    message: '',
+    type: 'info' // success, error, warning, info
+  });
+
+  const showNotification = (title, message, type = 'info') => {
+    setNotification({
+      isOpen: true,
+      title,
+      message,
+      type
+    });
+  };
+
+  const closeNotification = () => {
+    setNotification(prev => ({ ...prev, isOpen: false }));
+  };
 
   // State for programs and taken schedules
   const [programs, setPrograms] = useState([]);
@@ -55,15 +77,15 @@ const TutorRegister = () => {
     try {
       setLoading(true);
       setError(null);
-      
+
       // Load programs with classes
       const programsData = await programService.getProgramsWithClasses();
       setPrograms(programsData);
-      
+
       // Load taken schedules
       const takenSchedulesData = await programService.getTakenSchedules();
       setTakenSchedules(takenSchedulesData);
-      
+
     } catch (err) {
       console.error('Error loading data:', err);
       setError('Failed to load programs and schedules. Please try again.');
@@ -81,29 +103,30 @@ const TutorRegister = () => {
   useEffect(() => {
     if (selectedClass && user) {
       const isCurrentTutor = selectedClass.tutor_id === user.details.id;
-      
+
       if (isCurrentTutor) {
         // Load existing schedules for this class
         const loadExistingSchedules = async () => {
           try {
             // Find existing schedules for this class
-            const classSchedules = takenSchedules.find(schedule => 
+            const classSchedules = takenSchedules.find(schedule =>
               schedule.class_code === selectedClass.class_code
             );
-            
+
             if (classSchedules && classSchedules.schedules) {
               // Extract unique weeks
               const weeks = [...new Set(classSchedules.schedules.map(s => s.week))].sort((a, b) => a - b);
               setSelectedWeeks(weeks);
-              
+
               // Load the shared configuration from the first week (since all weeks have the same config)
               const firstWeekSchedules = classSchedules.schedules.filter(s => s.week === weeks[0]);
               const sharedPeriods = firstWeekSchedules.map(schedule => ({
                 day: schedule.day,
                 period: schedule.period,
-                room: schedule.room
+                room: schedule.room,
+                class_mode: schedule.class_mode || (schedule.room === 'Online' ? 'online' : 'offline')
               }));
-              
+
               setSharedConfiguration({ periods: sharedPeriods });
             } else {
               // If no existing schedules, reset the configurations
@@ -114,7 +137,7 @@ const TutorRegister = () => {
             console.error('Error loading existing schedules:', err);
           }
         };
-        
+
         loadExistingSchedules();
       } else {
         // If not current tutor, reset configurations
@@ -161,7 +184,7 @@ const TutorRegister = () => {
   // Filter programs based on search query
   const filteredPrograms = programs.filter(program => {
     if (!searchQuery.trim()) return true;
-    
+
     const query = searchQuery.toLowerCase();
     return (
       program.name?.toLowerCase().includes(query) ||
@@ -174,7 +197,7 @@ const TutorRegister = () => {
     console.log("Class Item", classItem);
     // Allow selection if class is available OR if current user is the assigned tutor
     const isCurrentTutor = user && classItem.tutor_id === user.details.id;
-    
+
     if (classItem.available || isCurrentTutor) {
       setSelectedClass(classItem);
       setCurrentStep(3);
@@ -193,22 +216,22 @@ const TutorRegister = () => {
 
   const handleSharedConfiguration = (day, period, room) => {
     const currentConfig = sharedConfiguration;
-    
+
     // Check if we're trying to add more periods than allowed
     if (currentConfig.periods.length >= selectedProgram?.period_per_week) {
-      alert(`You can only have ${selectedProgram?.period_per_week} period(s) per week for this program.`);
+      showNotification('Limit Reached', `You can only have ${selectedProgram?.period_per_week} period(s) per week for this program.`, 'warning');
       return;
     }
-    
+
     // Check if this specific slot is already configured
     const isSlotAlreadyConfigured = currentConfig.periods.some(p => p.day === day && p.period === period);
     if (isSlotAlreadyConfigured) {
-      alert('This time slot is already configured.');
+      showNotification('Slot Configured', 'This time slot is already configured.', 'info');
       return;
     }
-    
+
     const newPeriods = [...currentConfig.periods, { day, period, room }];
-    
+
     setSharedConfiguration({
       periods: newPeriods
     });
@@ -217,15 +240,31 @@ const TutorRegister = () => {
   const handleSlotClick = (day, period) => {
     const slotKey = `${day}-${period}`;
     setCurrentConfiguringSlot(slotKey);
-    
+
     // Check if this specific slot is already configured
     const isSlotConfigured = sharedConfiguration?.periods?.some(p => p.day === day && p.period === period);
-    
+
     if (isSlotConfigured) {
-      setShowRoomModal(true);
+      // If configured, maybe allow edit/delete? For now just show modal to overwrite?
+      // Or just do nothing / let delete handle it.
+      // Existing logic opened room modal. Let's keep opening logic but maybe ask mode again?
+      // Actually, typically click on filled slot might mean "edit".
+      // Let's stick to existing flow: open mode modal.
+      setShowModeModal(true);
     } else {
-      // Don't configure the slot yet - just open room modal
-      // The slot will only be configured when room is actually selected
+      setShowModeModal(true);
+    }
+  };
+
+  const handleModeSelect = (mode) => {
+    setShowModeModal(false);
+    if (mode === 'online') {
+      if (currentConfiguringSlot) {
+        const [day, period] = currentConfiguringSlot.split('-').map(Number);
+        handleSharedConfiguration(day, period, 'Online', 'online');
+        setCurrentConfiguringSlot(null);
+      }
+    } else {
       setShowRoomModal(true);
     }
   };
@@ -235,7 +274,7 @@ const TutorRegister = () => {
     if (config && config.periods) {
       // Remove the specific period from the shared configuration
       const newPeriods = config.periods.filter(p => !(p.day === day && p.period === period));
-      
+
       setSharedConfiguration({
         periods: newPeriods
       });
@@ -248,7 +287,7 @@ const TutorRegister = () => {
 
   const isSharedConfigurationComplete = () => {
     if (!sharedConfiguration || !sharedConfiguration.periods) return false;
-    
+
     // Check if the shared configuration has exactly the required number of periods
     return sharedConfiguration.periods.length === selectedProgram?.period_per_week;
   };
@@ -256,22 +295,22 @@ const TutorRegister = () => {
 
   const handleUnregister = async () => {
     if (!selectedClass || !user) return;
-    
+
     const isCurrentTutor = selectedClass.tutor_id === user.details.id;
     if (!isCurrentTutor) {
-      alert('You can only unregister from classes you are assigned to.');
+      showNotification('Permission Denied', 'You can only unregister from classes you are assigned to.', 'error');
       return;
     }
-    
+
     if (window.confirm(`Are you sure you want to unregister from class ${selectedClass.class_code}? This will remove all your schedules and make the class available for other tutors.`)) {
       try {
         setLoading(true);
         await programService.unregisterTutorFromClass(selectedClass.id);
-        alert('Successfully unregistered from the class!');
-        
+        showNotification('Success', 'Successfully unregistered from the class!', 'success');
+
         // Refresh data to show updated class status
         await loadData();
-        
+
         // Reset form state
         setSelectedClass(null);
         setSelectedWeeks([]);
@@ -279,7 +318,7 @@ const TutorRegister = () => {
         setCurrentStep(1);
       } catch (error) {
         console.error('Unregister failed:', error);
-        alert('Unregister failed: ' + error.message);
+        showNotification('Unregister Failed', error.message, 'error');
       } finally {
         setLoading(false);
       }
@@ -290,13 +329,13 @@ const TutorRegister = () => {
     try {
       setLoading(true);
       await programService.unregisterTutorFromClass(classId);
-      alert('Successfully unregistered from the class!');
-      
+      showNotification('Success', 'Successfully unregistered from the class!', 'success');
+
       // Refresh data to show updated class status
       await loadData();
     } catch (error) {
       console.error('Unregister failed:', error);
-      alert('Unregister failed: ' + error.message);
+      showNotification('Unregister Failed', error.message, 'error');
     } finally {
       setLoading(false);
     }
@@ -306,18 +345,18 @@ const TutorRegister = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
     if (!validateWeeks(selectedWeeks, selectedProgram)) {
-      alert('Please select the correct number of weeks as required by the program.');
+      showNotification('Invalid Weeks', 'Please select the correct number of weeks as required by the program.', 'warning');
       return;
     }
 
     // Check if the shared configuration has the correct number of periods
     if (!isSharedConfigurationComplete()) {
-      alert(`Please configure exactly ${selectedProgram?.period_per_week} period(s) for your schedule.`);
+      showNotification('Incomplete Schedule', `Please configure exactly ${selectedProgram?.period_per_week} period(s) for your schedule.`, 'warning');
       return;
     }
-    
+
     // Convert shared configuration to per-week configurations
     const weekConfigurations = {};
     selectedWeeks.forEach(week => {
@@ -325,16 +364,16 @@ const TutorRegister = () => {
     });
     try {
       setLoading(true);
-      
+
       // Prepare tutor information
       const tutorInfo = user ? {
         id: user.details.id,
         name: user.full_name || user.email || 'Unknown Tutor'
       } : null;
-      
+
       // Check if this is a modification of existing assignment
       const isModification = user && selectedClass?.tutor_id === user.details.id;
-      
+
       if (isModification) {
         // Update existing tutor assignment
         await programService.updateTutorAssignment(selectedClass.id, weekConfigurations, tutorInfo);
@@ -342,21 +381,21 @@ const TutorRegister = () => {
       } else {
         // Create new tutor assignment
         await programService.saveSchedulesForClass(selectedClass.id, weekConfigurations, tutorInfo);
-        alert('Tutor assignment successful!');
+        showNotification('Success', 'Tutor assignment successful!', 'success');
       }
-      
+
       // Refresh data to show updated class status
       await loadData();
-      
+
       // Reset form state
       setSelectedClass(null);
       setSelectedWeeks([]);
       setSharedConfiguration({ periods: [] });
       setCurrentStep(1);
-      
+
     } catch (error) {
       console.error('Assignment failed:', error);
-      alert('Assignment failed: ' + error.message);
+      showNotification('Assignment Failed', error.message, 'error');
     } finally {
       setLoading(false);
     }
@@ -433,9 +472,9 @@ const TutorRegister = () => {
             </div>
           )}
         </div>
-        
+
         <div className="mb-8">
-          
+
           {/* Search Bar */}
           {programs.length > 0 && (
             <div className="max-w-2xl mx-auto mb-8">
@@ -490,15 +529,15 @@ const TutorRegister = () => {
               </button>
             </div>
           ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                {filteredPrograms.map((program) => (
-                  <ProgramCard
-                    key={program.id}
-                    program={program}
-                    onClick={handleProgramSelect}
-                  />
-                ))}
-              </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              {filteredPrograms.map((program) => (
+                <ProgramCard
+                  key={program.id}
+                  program={program}
+                  onClick={handleProgramSelect}
+                />
+              ))}
+            </div>
           )}
         </div>
       </div>
@@ -538,7 +577,31 @@ const TutorRegister = () => {
 
   const renderCalendarSchedule = () => {
     const availableWeeks = getAvailableWeeks(selectedProgram);
-    
+
+    // Helper to check if the time slot is occupied by the CURRENT TUTOR in another class
+    const isTimeOccupiedByMe = (dayId, periodId) => {
+      if (!user?.details?.id || !selectedWeeks.length) return null;
+
+      // Iterate through all taken schedules
+      for (const classSched of takenSchedules) {
+        // Skip the current class we are editing
+        if (classSched.class_code === selectedClass?.class_code) continue;
+
+        // Check if this class is taught by ME
+        if (classSched.tutor_id === user.details.id) {
+          // Check if there is a schedule conflict
+          const hasConflict = classSched.schedules.some(s =>
+            s.day === dayId &&
+            s.period === periodId &&
+            selectedWeeks.includes(s.week)
+          );
+
+          if (hasConflict) return classSched;
+        }
+      }
+      return null;
+    };
+
     return (
       <div className="p-6">
         {/* Header with week selection */}
@@ -551,11 +614,10 @@ const TutorRegister = () => {
               <button
                 key={week}
                 onClick={() => handleWeekToggle(week)}
-                className={`px-4 py-2 rounded-lg font-medium transition-all duration-300 ${
-                  selectedWeeks.includes(week)
-                    ? 'bg-blue-600 text-white shadow-lg transform scale-105'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                }`}
+                className={`px-4 py-2 rounded-lg font-medium transition-all duration-300 ${selectedWeeks.includes(week)
+                  ? 'bg-blue-600 text-white shadow-lg transform scale-105'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
                 disabled={selectedWeeks.length >= selectedProgram?.number_of_week && !selectedWeeks.includes(week)}
               >
                 Week {week}
@@ -604,31 +666,48 @@ const TutorRegister = () => {
                     {daysOfWeek.map((day) => {
                       const isConfigured = isSlotConfigured(day.id, period.id);
                       const slotConfig = sharedConfiguration?.periods?.find(p => p.day === day.id && p.period === period.id);
-                      
+                      const occupiedByMeClass = isTimeOccupiedByMe(day.id, period.id);
+
                       return (
                         <div key={`cell-${day.id}-${period.id}`} className="relative h-12 border-b border-gray-200">
                           <button
-                            onClick={() => handleSlotClick(day.id, period.id)}
-                            className={`h-full w-full ${
-                              isConfigured
-                                ? 'bg-green-100 border-2 border-green-400'
-                                : 'bg-gray-50 hover:bg-blue-50 hover:border-blue-300'
-                            }`}
+                            onClick={() => !occupiedByMeClass && handleSlotClick(day.id, period.id)}
+                            disabled={!!occupiedByMeClass}
+                            className={`h-full w-full relative transition-all duration-200 ${occupiedByMeClass
+                              ? 'bg-red-50 border-2 border-red-200 cursor-not-allowed' // Occupied style
+                              : isConfigured
+                                ? slotConfig?.class_mode === 'online'
+                                  ? 'bg-blue-100 border-2 border-blue-400' // Online style
+                                  : 'bg-green-100 border-2 border-green-400' // Offline style
+                                : 'bg-gray-50 hover:bg-gray-100 hover:border-blue-300 border border-transparent'
+                              }`}
                             title={
-                              isConfigured 
-                                ? `Configured: ${slotConfig?.room || 'No room'}` 
-                                : 'Click to configure'
+                              occupiedByMeClass
+                                ? `Occupied by your class: ${occupiedByMeClass.class_code}`
+                                : isConfigured
+                                  ? `${slotConfig?.class_mode === 'online' ? 'Online Class' : `Room: ${slotConfig?.room}`}`
+                                  : 'Click to configure'
                             }
                           >
-                            {isConfigured && slotConfig?.room && (
-                              <div className="absolute inset-0 flex items-center justify-center">
-                                <span className="text-xs text-green-700 font-medium truncate px-1">
-                                  {slotConfig.room}
+                            {occupiedByMeClass && (
+                              <div className="absolute inset-0 flex flex-col items-center justify-center p-1">
+                                <span className="text-[10px] font-bold text-red-400">Busy</span>
+                                <span className="text-[10px] text-red-300 truncate w-full text-center">
+                                  {occupiedByMeClass.class_code}
+                                </span>
+                              </div>
+                            )}
+
+                            {!occupiedByMeClass && isConfigured && (
+                              <div className="absolute inset-0 flex items-center justify-center p-1">
+                                <span className={`text-sm font-bold truncate w-full text-center ${slotConfig?.class_mode === 'online' ? 'text-blue-700' : 'text-green-700'
+                                  }`}>
+                                  {slotConfig?.class_mode === 'online' ? 'Online' : slotConfig?.room}
                                 </span>
                               </div>
                             )}
                           </button>
-                          
+
                           {/* Delete button for configured slots */}
                           {isConfigured && (
                             <button
@@ -659,11 +738,15 @@ const TutorRegister = () => {
             <span>Your Schedule (shows room code)</span>
           </div>
           <div className="flex items-center space-x-2">
+            <div className="w-4 h-4 bg-red-100 border border-red-400 rounded"></div>
+            <span>Your Occupied Slots</span>
+          </div>
+          <div className="flex items-center space-x-2">
             <div className="w-4 h-4 bg-gray-50 border border-gray-200 rounded"></div>
             <span>Available</span>
           </div>
         </div>
-        
+
         {/* Instructions */}
         <div className="mt-4 p-4 bg-blue-50 rounded-lg">
           <h4 className="text-sm font-semibold text-blue-800 mb-2">Instructions:</h4>
@@ -792,6 +875,7 @@ const TutorRegister = () => {
       </div>
 
       {/* Room Selection Modal */}
+      {/* Room Selection Modal */}
       <RoomSelectionModal
         isOpen={showRoomModal}
         onClose={() => {
@@ -799,27 +883,39 @@ const TutorRegister = () => {
           setCurrentConfiguringSlot(null);
         }}
         onSelectRoom={(room) => {
-          // Get the slot information from the current configuring slot
-          const slotParts = currentConfiguringSlot?.split('-');
-          if (slotParts && slotParts.length === 2) {
-            const day = parseInt(slotParts[0]);
-            const period = parseInt(slotParts[1]);
-            
-            // Configure the slot with the selected room
-            // (conflict checking is already done in the modal)
-            handleSharedConfiguration(day, period, room);
+          if (currentConfiguringSlot) {
+            const [day, period] = currentConfiguringSlot.split('-').map(Number);
+            handleSharedConfiguration(day, period, room, 'offline');
           }
-          setShowRoomModal(false);
+        }}
+        selectedWeeks={selectedWeeks}
+        takenSchedules={takenSchedules}
+        currentTimeSlot={
+          currentConfiguringSlot
+            ? {
+              day: Number(currentConfiguringSlot.split('-')[0]),
+              period: Number(currentConfiguringSlot.split('-')[1])
+            }
+            : null
+        }
+        currentClassCode={selectedClass?.class_code}
+      />
+
+      <ModeSelectionModal
+        isOpen={showModeModal}
+        onClose={() => {
+          setShowModeModal(false);
           setCurrentConfiguringSlot(null);
         }}
-        takenSchedules={takenSchedules}
-        selectedWeeks={selectedWeeks}
-        currentTimeSlot={currentConfiguringSlot ? {
-          week: null,
-          day: parseInt(currentConfiguringSlot.split('-')[0]),
-          period: parseInt(currentConfiguringSlot.split('-')[1])
-        } : null}
-        currentClassCode={selectedClass?.class_code}
+        onSelectMode={handleModeSelect}
+      />
+
+      <NotificationModal
+        isOpen={notification.isOpen}
+        onClose={closeNotification}
+        title={notification.title}
+        message={notification.message}
+        type={notification.type}
       />
     </div>
   );

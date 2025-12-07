@@ -137,6 +137,15 @@ export default function StudentRegister() {
   };
 
   const handleRegister = (programData, classData) => {
+    const overlap = checkScheduleOverlap(classData.schedule, studentEnrollments);
+    if (overlap) {
+      showNotification(
+        `Time conflict detected with ${overlap.conflictingClass} on ${getDayName(overlap.day)} Period ${overlap.period}.`,
+        "error",
+        "Schedule Conflict"
+      );
+      return;
+    }
     setSelectedClass({ program: programData, class: classData });
     setShowModal(true);
   };
@@ -400,10 +409,12 @@ export default function StudentRegister() {
       classItem => classItem.tutor_name && classItem.tutor_name.trim() !== ''
     );
 
-    // Filter available classes (not full, not already enrolled)
-    const availableClasses = classesWithTutors.filter(classData =>
-      canRegister(program, classData)
-    );
+    // Filter available classes (not full, not already enrolled, NO OVERLAPS)
+    const availableClasses = classesWithTutors.filter(classData => {
+      const basicCheck = canRegister(program, classData);
+      const isOverlap = checkScheduleOverlap(classData.schedule, studentEnrollments);
+      return basicCheck && !isOverlap;
+    });
 
     if (availableClasses.length === 0) {
       showNotification(
@@ -497,11 +508,50 @@ export default function StudentRegister() {
     return studentEnrollments.some(enrollment => enrollment.program?.id === programId);
   };
 
+  const checkScheduleOverlap = (newClassSchedule, currentEnrollments) => {
+    // Flatten current enrollments into a list of schedule slots
+    const occupiedSlots = [];
+    currentEnrollments.forEach(enrollment => {
+      if (enrollment.schedule) {
+        enrollment.schedule.forEach(slot => {
+          occupiedSlots.push(slot);
+        });
+      }
+    });
+
+    // Check for overlaps
+    for (const newSlot of newClassSchedule) {
+      for (const occupied of occupiedSlots) {
+        // 1. Check if same day and period
+        if (newSlot.day === occupied.day && newSlot.period == occupied.period) { // loose equality for period
+          // 2. Check if weeks overlap
+          const newWeeks = Array.isArray(newSlot.weeks) ? newSlot.weeks : [newSlot.weeks];
+          const occupiedWeeks = Array.isArray(occupied.weeks) ? occupied.weeks : [occupied.weeks];
+
+          // Since weeks are likely strings like "35", we compare them
+          // If we had ranges "1-15", we'd parse. Assuming single values/strings for now.
+          const hasWeekOverlap = newWeeks.some(nw => occupiedWeeks.includes(nw));
+
+          if (hasWeekOverlap) {
+            return {
+              overlap: true,
+              conflictingClass: currentEnrollments.find(e => e.schedule.includes(occupied))?.class?.classCode || "Unknown Class",
+              day: newSlot.day,
+              period: newSlot.period
+            };
+          }
+        }
+      }
+    }
+    return null;
+  };
+
   const canRegister = (program, classData) => {
     if (program.status !== "active") return false;
     if (isFull(classData)) return false;
     if (isAlreadyEnrolled(classData.id)) return false;
     if (isEnrolledInProgram(program.id)) return false; // One class per program
+    // Note: Overlap check is expensive, maybe don't run it here for every render, but definitely run in AutoMatch filter
     return true;
   };
 

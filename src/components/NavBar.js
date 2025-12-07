@@ -66,11 +66,11 @@ export default function Navbar() {
             <Link to="/tutor-register" className="hover:text-gray-300">
               Register
             </Link>
+            <Link to="/tutor-schedule" className="hover:text-gray-300">
+              Schedule
+            </Link>
             {/* <Link to="/support" className="hover:text-gray-300">
               Support
-            </Link>
-            <Link to="/tutor-schedule" className="hover:text-gray-300">
-              Tutor Schedule
             </Link> */}
           </>
         )}

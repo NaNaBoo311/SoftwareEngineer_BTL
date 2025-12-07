@@ -1,283 +1,239 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { tutorService } from '../services/tutorService';
-import { useUser } from '../context/UserContext';
 
-const TutorSchedule = () => {
+import React, { useState, useEffect } from "react";
+import { useUser } from "../context/UserContext";
+import { tutorService } from "../services/tutorService";
+import { useNavigate } from "react-router-dom";
+import { ArrowLeft, Calendar as CalendarIcon, ChevronLeft, ChevronRight } from "lucide-react";
+
+export default function TutorSchedule() {
+  const { user } = useUser();
   const navigate = useNavigate();
-  const { user, loading: userLoading } = useUser();
-  const [schedules, setSchedules] = useState([]);
+  const [scheduleItems, setScheduleItems] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [currentDate, setCurrentDate] = useState(new Date());
 
-  // Days of the week (Monday to Saturday)
-  const daysOfWeek = [
-    { id: 1, name: 'Monday', short: 'Mon' },
-    { id: 2, name: 'Tuesday', short: 'Tue' },
-    { id: 3, name: 'Wednesday', short: 'Wed' },
-    { id: 4, name: 'Thursday', short: 'Thu' },
-    { id: 5, name: 'Friday', short: 'Fri' },
-    { id: 6, name: 'Saturday', short: 'Sat' }
-  ];
+  // Constants
+  const periods = Array.from({ length: 12 }, (_, i) => i + 1); // 1 to 12
+  const daysOfWeek = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 
-  // Periods 1-12
-  const periods = Array.from({ length: 12 }, (_, i) => ({ id: i + 1, name: String(i + 1) }));
+  // Helper to get dates for the current week (starting Monday)
+  const getWeekDates = (baseDate) => {
+    const dates = [];
+    const currentDay = baseDate.getDay(); // 0 is Sunday, 1 is Monday
+    const diffToMonday = currentDay === 0 ? -6 : 1 - currentDay; // Calculate overlap to Monday
 
-  // Color palette for different classes
-  const classColors = [
-    { bg: 'bg-blue-100', border: 'border-blue-400', text: 'text-blue-700', hover: 'hover:bg-blue-200' },
-    { bg: 'bg-green-100', border: 'border-green-400', text: 'text-green-700', hover: 'hover:bg-green-200' },
-    { bg: 'bg-purple-100', border: 'border-purple-400', text: 'text-purple-700', hover: 'hover:bg-purple-200' },
-    { bg: 'bg-orange-100', border: 'border-orange-400', text: 'text-orange-700', hover: 'hover:bg-orange-200' },
-    { bg: 'bg-pink-100', border: 'border-pink-400', text: 'text-pink-700', hover: 'hover:bg-pink-200' },
-    { bg: 'bg-indigo-100', border: 'border-indigo-400', text: 'text-indigo-700', hover: 'hover:bg-indigo-200' },
-    { bg: 'bg-teal-100', border: 'border-teal-400', text: 'text-teal-700', hover: 'hover:bg-teal-200' },
-    { bg: 'bg-red-100', border: 'border-red-400', text: 'text-red-700', hover: 'hover:bg-red-200' }
-  ];
+    // Start from Monday of the current week
+    const monday = new Date(baseDate);
+    monday.setDate(baseDate.getDate() + diffToMonday);
 
-  const [classColorMap, setClassColorMap] = useState({});
-
-  // Fetch schedules on mount
-  useEffect(() => {
-    if (user?.details?.id) {
-      loadSchedules();
+    for (let i = 0; i < 7; i++) {
+      const day = new Date(monday);
+      day.setDate(monday.getDate() + i);
+      dates.push(day);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    return dates;
+  };
+
+  const weekDates = getWeekDates(currentDate);
+
+  useEffect(() => {
+    if (user?.role === "tutor" && user.details?.id) {
+      fetchSchedule();
+    } else {
+      setLoading(false);
+    }
   }, [user]);
 
-  const loadSchedules = async () => {
+  const fetchSchedule = async () => {
     try {
       setLoading(true);
-      setError(null);
-
       const data = await tutorService.getTutorSchedules(user.details.id);
-      const normalized = data.map(s => ({
-        ...s,
-        day: Number(s.day),
-        period: Number(s.period),
-        weeks: Array.isArray(s.weeks)
-          ? s.weeks
-          : s.weeks
-            ? String(s.weeks)
-                .split(',')
-                .map(w => Number(w.trim()))
-            : [] // default empty
-      }));
-      
-      setSchedules(normalized);
-      // Assign unique colors to each class
-      const uniqueClasses = [...new Set(data.map(s => s.class?.class_code).filter(Boolean))];
-      const colorMapping = {};
-      uniqueClasses.forEach((classCode, index) => {
-        colorMapping[classCode] = classColors[index % classColors.length];
-      });
-      setClassColorMap(colorMapping);
 
-    } catch (err) {
-      console.error('Error loading schedules:', err);
-      setError('Failed to load schedules. Please try again.');
+      // Map the nested tutor schedule structure to the flat structure used by the component
+      const formattedItems = data.map(item => ({
+        day: item.day,
+        period: item.period,
+        weeks: item.weeks,
+        room: item.room,
+        class_code: item.class?.class_code,
+        program_name: item.class?.program?.name || "Unknown Program"
+      }));
+
+      setScheduleItems(formattedItems);
+    } catch (error) {
+      console.error("Error fetching schedule:", error);
     } finally {
       setLoading(false);
     }
   };
 
-  // Get schedule for a specific day and period
-  const getScheduleForSlot = (day, period) => {
-    return schedules.find(schedule => 
-      Number(schedule.day) === day && Number(schedule.period) === period
-    );
+  // Helper to format date header
+  const formatDateHeader = (date) => {
+    const dayName = date.toLocaleDateString("en-US", { weekday: "long" });
+    const dayDate = date.toLocaleDateString("en-GB", { day: "2-digit", month: "2-digit" });
+    return { dayName, dayDate };
   };
 
-  // Loading state
-  if (userLoading || loading) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-blue-600 mx-auto mb-6"></div>
-          <p className="text-xl text-gray-600 font-medium">
-            {userLoading ? 'Loading user information...' : 'Loading schedules...'}
-          </p>
-        </div>
-      </div>
-    );
-  }
+  // Helper to find class for a specific day and period
+  const getClassForSlot = (dayName, period) => {
+    const dayMap = {
+      "1": "Monday", "2": "Tuesday", "3": "Wednesday",
+      "4": "Thursday", "5": "Friday", "6": "Saturday", "7": "Sunday"
+    };
 
-  // Authentication required
-  if (!user) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center p-4">
-        <div className="text-center max-w-md">
-          <div className="text-red-600 text-7xl mb-6">🔒</div>
-          <h2 className="text-3xl font-bold text-gray-800 mb-4">Authentication Required</h2>
-          <p className="text-lg text-gray-600 mb-8">Please log in to view your teaching schedules.</p>
-          <button
-            onClick={() => navigate('/')}
-            className="px-8 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-all duration-300 transform hover:scale-105 shadow-lg font-semibold"
-          >
-            Go to Login
-          </button>
-        </div>
-      </div>
-    );
-  }
+    return scheduleItems.find(item => {
+      // Handle day matching
+      const itemDayName = dayMap[String(item.day)] || item.day;
+      const isDayMatch = itemDayName === dayName;
 
-  // Error state
-  if (error) {
+      // Handle period matching (loose equality for string/number match)
+      const isPeriodMatch = item.period == period;
+
+      return isDayMatch && isPeriodMatch;
+    });
+  };
+
+  const navigateWeek = (direction) => {
+    const newDate = new Date(currentDate);
+    newDate.setDate(currentDate.getDate() + (direction * 7));
+    setCurrentDate(newDate);
+  };
+
+  // Helper to generate a consistent color for a program name
+  const getColorForProgram = (programName) => {
+    if (!programName) return "bg-gray-100 border-gray-500 text-gray-800";
+
+    const colors = [
+      "bg-blue-100 border-blue-500 text-blue-800",
+      "bg-green-100 border-green-500 text-green-800",
+      "bg-purple-100 border-purple-500 text-purple-800",
+      "bg-orange-100 border-orange-500 text-orange-800",
+      "bg-pink-100 border-pink-500 text-pink-800",
+      "bg-teal-100 border-teal-500 text-teal-800",
+      "bg-indigo-100 border-indigo-500 text-indigo-800",
+      "bg-rose-100 border-rose-500 text-rose-800",
+    ];
+
+    let hash = 0;
+    for (let i = 0; i < programName.length; i++) {
+      hash = programName.charCodeAt(i) + ((hash << 5) - hash);
+    }
+
+    const index = Math.abs(hash) % colors.length;
+    return colors[index];
+  };
+
+  if (!user || user.role !== "tutor") {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center p-4">
-        <div className="text-center max-w-md">
-          <div className="text-red-600 text-7xl mb-6">⚠️</div>
-          <h2 className="text-3xl font-bold text-gray-800 mb-4">Error Loading Schedules</h2>
-          <p className="text-lg text-gray-600 mb-8">{error}</p>
-          <button
-            onClick={loadSchedules}
-            className="px-8 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-all duration-300 transform hover:scale-105 shadow-lg font-semibold"
-          >
-            Try Again
-          </button>
-        </div>
+      <div className="p-8 text-center">
+        <h2 className="text-xl font-bold text-red-600">Access Denied</h2>
+        <p>Please log in as a tutor to view your schedule.</p>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
-      <div className="max-w-7xl mx-auto p-4 md:p-8">
-        {/* Header */}
-        <div className="text-center mb-8 md:mb-12">
-          <h1 className="text-3xl md:text-5xl font-bold text-gray-800 mb-4">
-            My Teaching Schedule
+    <div className="min-h-screen bg-gray-50 p-6">
+      {/* Header */}
+      <div className="flex justify-between items-center mb-6">
+        <div className="flex items-center gap-4">
+          <button
+            onClick={() => navigate(-1)}
+            className="p-2 hover:bg-gray-200 rounded-full transition"
+          >
+            <ArrowLeft size={24} />
+          </button>
+          <h1 className="text-3xl font-bold text-blue-900 flex items-center gap-2">
+            <CalendarIcon /> Teaching Schedule
           </h1>
-
-          {user && (
-            <div className="inline-block bg-blue-50 border-2 border-blue-200 rounded-xl px-6 py-3 shadow-sm">
-              <p className="text-sm md:text-base text-blue-700">
-                Tutor: <span className="font-bold">{user.full_name || user.email}</span>
-              </p>
-            </div>
-          )}
         </div>
 
-        {/* Empty state */}
-        {schedules.length === 0 ? (
-          <div className="text-center py-16 md:py-24">
-            <div className="text-gray-400 text-7xl md:text-8xl mb-6">📅</div>
-            <h3 className="text-2xl md:text-3xl font-bold text-gray-600 mb-4">No Schedules Yet</h3>
-            <p className="text-base md:text-lg text-gray-500 mb-8 max-w-md mx-auto">
-              You haven't been assigned to any classes yet. Register for classes to get started.
-            </p>
-            <button
-              onClick={() => navigate('/tutor-register')}
-              className="px-8 py-4 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-all duration-300 transform hover:scale-105 shadow-lg font-semibold text-lg"
-            >
-              Register for Classes
-            </button>
-          </div>
-        ) : (
-          <>
-            {/* Calendar Grid */}
-            <div className="bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden max-w-6xl mx-auto">
-              {/* Calendar Header */}
-              <div className="px-4 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 border-b border-blue-700">
-                <div className="text-center">
-                  <h2 className="text-lg md:text-xl font-bold text-white">
-                    Teaching Schedule Calendar
-                  </h2>
-                </div>
-              </div>
+        {/* Date Navigation */}
+        <div className="flex items-center bg-white rounded-lg shadow-sm border border-gray-200 p-1">
+          <button onClick={() => navigateWeek(-1)} className="p-2 hover:bg-gray-100 rounded-md">
+            <ChevronLeft size={20} />
+          </button>
+          <span className="px-4 font-semibold text-gray-700 min-w-[200px] text-center">
+            {weekDates[0].toLocaleDateString("en-US", { month: "short", day: "numeric" })} - {weekDates[6].toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+          </span>
+          <button onClick={() => navigateWeek(1)} className="p-2 hover:bg-gray-100 rounded-md">
+            <ChevronRight size={20} />
+          </button>
+        </div>
+      </div>
 
-              {/* Calendar Table */}
-              <div className="overflow-x-auto">
-                <div className="min-w-[700px]">
-                  {/* Header Row: Days of Week */}
-                  <div 
-                    className="grid bg-gray-100 border-b-2 border-gray-300"
-                    style={{ gridTemplateColumns: `80px repeat(6, 1fr)` }}
-                  >
-                    <div className="p-2 border-r border-gray-300 text-xs md:text-sm font-bold text-gray-700 flex items-center justify-center">
-                      Period
-                    </div>
-                    {daysOfWeek.map((day) => (
-                      <div 
-                        key={`hdr-${day.id}`} 
-                        className="p-2 text-center text-xs md:text-sm font-bold text-gray-700 border-r border-gray-300 last:border-r-0"
-                      >
-                        {day.short}
-                      </div>
-                    ))}
-                  </div>
+      {loading ? (
+        <div className="text-center py-20 text-gray-500">Loading schedule...</div>
+      ) : (
+        <div className="bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[1000px] border-collapse">
+              <thead>
+                <tr>
+                  <th className="p-4 border-b border-r border-gray-100 bg-gray-50 w-24 sticky left-0 z-10 text-gray-400 font-medium">
+                    Period
+                  </th>
+                  {weekDates.map((date, index) => {
+                    const { dayName, dayDate } = formatDateHeader(date);
+                    const isToday = new Date().toDateString() === date.toDateString();
+                    return (
+                      <th key={index} className={`p-4 border-b border-gray-100 min-w-[140px] ${isToday ? 'bg-blue-50' : 'bg-white'}`}>
+                        <div className="flex flex-col items-center">
+                          <span className={`text-sm font-bold ${isToday ? 'text-blue-600' : 'text-gray-800'}`}>
+                            {dayName}
+                          </span>
+                          <span className={`text-xs mt-1 px-2 py-0.5 rounded-full ${isToday ? 'bg-blue-600 text-white' : 'text-gray-500 bg-gray-100'}`}>
+                            {dayDate}
+                          </span>
+                        </div>
+                      </th>
+                    );
+                  })}
+                </tr>
+              </thead>
+              <tbody>
+                {periods.map((period) => (
+                  <tr key={period} className="hover:bg-gray-50 transition-colors">
+                    {/* Period Column */}
+                    <td className="p-4 border-b border-r border-gray-100 bg-gray-50 text-center font-semibold text-gray-600 sticky left-0 z-10">
+                      {period}
+                    </td>
 
-                  {/* Period Rows */}
-                  {periods.map((period) => (
-                    <div 
-                      key={`row-${period.id}`}
-                      className="grid border-b border-gray-200 hover:bg-gray-50 transition-colors duration-200"
-                      style={{ gridTemplateColumns: `80px repeat(6, 1fr)` }}
-                    >
-                      {/* Period Label */}
-                      <div className="p-2 border-r border-gray-300 bg-gray-50 text-xs md:text-sm font-semibold text-gray-700 flex items-center justify-center">
-                        {period.name}
-                      </div>
+                    {/* Day Columns */}
+                    {daysOfWeek.map((dayName) => {
+                      const classItem = getClassForSlot(dayName, period);
+                      // Get color if class exists
+                      const colorClass = classItem ? getColorForProgram(classItem.program_name) : "";
 
-                      {/* Day Cells */}
-                      {daysOfWeek.map((day) => {
-                        const schedule = getScheduleForSlot(day.id, period.id);
-                        const color = schedule ? classColorMap[schedule.class?.class_code] : null;
-                        
-                        return (
-                          <div 
-                            key={`cell-${day.id}-${period.id}`}
-                            className={`relative min-h-[70px] p-2 border-r border-gray-200 last:border-r-0 transition-all duration-300 ${
-                              schedule 
-                                ? `${color?.bg} ${color?.hover} border-l-4 ${color?.border}` 
-                                : 'bg-white hover:bg-gray-50'
-                            }`}
-                          >
-                            {schedule ? (
-                              <div className="h-full flex flex-col justify-center items-center space-y-0.5">
-                                {/* Program Code */}
-                                <div className={`text-[10px] ${color?.text} font-medium text-center opacity-80`}>
-                                  {schedule.class?.program?.program_code || ''}
+                      return (
+                        <td key={dayName} className="border-b border-r border-gray-100 p-1 h-24 align-top relative">
+                          {classItem && (
+                            <div className={`absolute inset-1 border-l-4 rounded p-2 text-xs flex flex-col justify-between overflow-hidden hover:scale-[1.02] transition-transform shadow-sm cursor-pointer z-0 ${colorClass}`}>
+                              <div>
+                                <div className="font-bold text-sm truncate opacity-90" title={classItem.class_code}>
+                                  {classItem.class_code}
                                 </div>
-                                
-                                {/* Class Code */}
-                                <div className={`text-xs font-bold ${color?.text} text-center`}>
-                                  {schedule.class?.class_code || 'N/A'}
-                                </div>
-                                
-                                {/* Room Number */}
-                                <div className={`text-xs ${color?.text} font-semibold text-center`}>
-                                  {schedule.room}
+                                <div className="text-xs font-semibold truncate opacity-80" title={classItem.program_name}>
+                                  {classItem.program_name}
                                 </div>
                               </div>
-                            ) : null}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Legend */}
-              <div className="px-4 py-3 bg-gray-50 border-t border-gray-300">
-                <div className="flex flex-wrap gap-3 text-xs items-center justify-center">
-                  <div className="flex items-center space-x-2">
-                    <div className="w-4 h-4 bg-white border-2 border-gray-300 rounded"></div>
-                    <span className="text-gray-700 font-medium">No Class</span>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <div className="w-4 h-4 bg-blue-100 border-l-4 border-blue-400 rounded"></div>
-                    <span className="text-gray-700 font-medium">Scheduled Class</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </>
-        )}
-      </div>
+                              <div className="font-medium flex items-center gap-1 mt-1 opacity-70">
+                                <span className="bg-white/50 px-1.5 py-0.5 rounded text-[10px] uppercase tracking-wider">
+                                  Room {classItem.room}
+                                </span>
+                              </div>
+                            </div>
+                          )}
+                        </td>
+                      );
+                    })}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
     </div>
   );
-};
-
-export default TutorSchedule;
+}

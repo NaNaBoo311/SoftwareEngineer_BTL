@@ -265,11 +265,18 @@ class StudentService {
           tutor_name,
           max_students,
           current_students,
+          current_students,
           programs (
             id,
             program_code,
             name,
             description
+          ),
+          schedules (
+            day,
+            period,
+            weeks,
+            room
           )
         )
       `)
@@ -299,6 +306,7 @@ class StudentService {
           name: programData.name,
           description: programData.description,
         } : null,
+        schedule: classData?.schedules || []
       };
     });
 
