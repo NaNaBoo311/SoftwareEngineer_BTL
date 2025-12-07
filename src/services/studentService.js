@@ -49,7 +49,9 @@ class StudentService {
     password,
     studentCode,
     major,
-    faculty = "Computer Science and Engineering"
+    faculty = "Computer Science and Engineering",
+    academicYear = 2024,
+    gpa = 0.0
   ) {
     // Step 1: Register the user in Supabase Auth
     const { data: signUpData, error: signUpError } = await supabase.auth.signUp(
@@ -86,7 +88,9 @@ class StudentService {
         user_id: userId,
         student_code: studentCode,
         major: major,
-        faculty: faculty
+        faculty: faculty,
+        academic_year: academicYear,
+        gpa: gpa
       })
       .select()
       .single();
