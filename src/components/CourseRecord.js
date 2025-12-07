@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useUser } from '../context/UserContext';
 import { classService } from '../services/classService';
-import { Loader2, Users, ArrowLeft, GraduationCap } from 'lucide-react';
+import { recordService } from '../services/recordService';
+import { Loader2, Users, ArrowLeft, GraduationCap, Edit, Save, X } from 'lucide-react';
 
 const CourseRecord = ({ courseTitle, classId }) => {
   const { user } = useUser();
@@ -49,6 +50,16 @@ const CourseRecord = ({ courseTitle, classId }) => {
   // If user is a student, show their own record directly
   if (user?.role === 'student') {
     // Prepare student data from user context
+    // We need the studentId (uuid from public.students) to fetch grades.
+    // The context might only have user.id (auth).
+    // Luckily recordService.getStudentGrades needs studentId.
+    // We might need to fetch studentId first?
+    // Actually, classService.getStudentsInClass returns studentId.
+    // But for a logged in student, we might not have it handy in 'user' object if not populated.
+    // We can fetch it or pass it. 
+    // Ideally user.details.id is the student_id if we have it?
+    // Let's assume user.details.id is correct (from StudentRoute wrapper usually).
+
     const studentData = {
       fullName: user?.full_name || user?.details?.full_name || 'Student',
       studentCode: user?.details?.student_code || 'N/A',
@@ -56,7 +67,7 @@ const CourseRecord = ({ courseTitle, classId }) => {
       studentId: user?.details?.id,
     };
 
-    return <StudentRecordView studentData={studentData} courseTitle={courseTitle} />;
+    return <StudentRecordView studentData={studentData} courseTitle={courseTitle} classId={classId} />;
   }
 
   // If user is a tutor and viewing the list
@@ -174,6 +185,7 @@ const CourseRecord = ({ courseTitle, classId }) => {
         <StudentRecordView
           studentData={selectedStudent}
           courseTitle={courseTitle}
+          classId={classId}
           isTutorView={true}
         />
       </div>
@@ -184,92 +196,134 @@ const CourseRecord = ({ courseTitle, classId }) => {
 };
 
 // Component to display individual student record
-const StudentRecordView = ({ studentData, courseTitle, isTutorView = false }) => {
-  // Mock data - in a real app, this would come from an API based on studentData
-  const [recordData] = useState({
-    studentName: studentData?.fullName || 'Nguyễn Văn A',
-    studentCode: studentData?.studentCode || 'SV001',
-    overallGrade: 8.5,
-    attendance: 92,
-    assignments: [
-      {
-        id: 1,
-        title: 'Assignment 1: Graph Theory',
-        score: 9.0,
-        maxScore: 10,
-        weight: 15,
-        dueDate: '2024-01-15',
-        submittedDate: '2024-01-14',
-        status: 'graded'
-      },
-      {
-        id: 2,
-        title: 'Assignment 2: Tree Structures',
-        score: 8.5,
-        maxScore: 10,
-        weight: 15,
-        dueDate: '2024-02-01',
-        submittedDate: '2024-01-31',
-        status: 'graded'
-      },
-      {
-        id: 3,
-        title: 'Assignment 3: Algorithms',
-        score: null,
-        maxScore: 10,
-        weight: 20,
-        dueDate: '2024-02-20',
-        submittedDate: '2024-02-18',
-        status: 'pending'
+const StudentRecordView = ({ studentData, courseTitle, classId, isTutorView = false }) => {
+  const [assessments, setAssessments] = useState([]);
+  const [grades, setGrades] = useState({}); // Map assessmentId -> grade object
+  const [attendanceWeeks, setAttendanceWeeks] = useState([]); // Array of attended weeks
+  const [loading, setLoading] = useState(true);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editValues, setEditValues] = useState({}); // Local state for edits
+  const [editAttendanceWeeks, setEditAttendanceWeeks] = useState([]);
+  const [weekRange, setWeekRange] = useState({ start: 1, end: 15 }); // Default range
+
+  useEffect(() => {
+    fetchData();
+  }, [classId, studentData.studentId]);
+
+  const fetchData = async () => {
+    if (!classId || !studentData.studentId) return;
+    try {
+      setLoading(true);
+      const [asses, grds, attWeeks, classDetails] = await Promise.all([
+        recordService.getAssessments(classId),
+        recordService.getStudentGrades(studentData.studentId, classId),
+        recordService.getAttendance(studentData.studentId, classId),
+        classService.getClassById(classId)
+      ]);
+
+      setAssessments(asses);
+
+      // Map grades for easier access
+      const gMap = {};
+      grds.forEach(g => {
+        gMap[g.assessment_id] = g;
+      });
+      setGrades(gMap);
+
+      setAttendanceWeeks(attWeeks);
+      setEditAttendanceWeeks(attWeeks);
+
+      if (classDetails?.program) {
+        setWeekRange({
+          start: classDetails.program.start_week,
+          end: classDetails.program.end_week
+        });
       }
-    ],
-    quizzes: [
-      {
-        id: 1,
-        title: 'Quiz 1: Set Theory',
-        score: 85,
-        maxScore: 100,
-        weight: 10,
-        date: '2024-01-10',
-        status: 'completed'
-      },
-      {
-        id: 2,
-        title: 'Quiz 2: Logic',
-        score: 92,
-        maxScore: 100,
-        weight: 10,
-        date: '2024-01-24',
-        status: 'completed'
-      },
-      {
-        id: 3,
-        title: 'Quiz 3: Combinatorics',
-        score: null,
-        maxScore: 100,
-        weight: 10,
-        date: '2024-02-10',
-        status: 'upcoming'
-      }
-    ],
-    midterm: {
-      score: 88,
-      maxScore: 100,
-      weight: 20,
-      date: '2024-01-30',
-      status: 'completed'
-    },
-    finalExam: {
-      score: null,
-      maxScore: 100,
-      weight: 30,
-      date: '2024-03-15',
-      status: 'upcoming'
+
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
     }
-  });
+  };
+
+  const handleInitializeDefaults = async () => {
+    try {
+      setLoading(true);
+      await recordService.initializeDefaultAssessments(classId);
+      await fetchData();
+    } catch (err) {
+      console.error(err);
+      alert("Failed to initialize");
+      setLoading(false);
+    }
+  };
+
+  const handleSave = async () => {
+    try {
+      setLoading(true);
+      // Save attendance (always save array)
+      if (JSON.stringify(editAttendanceWeeks) !== JSON.stringify(attendanceWeeks)) {
+        await recordService.saveAttendance(studentData.studentId, classId, editAttendanceWeeks);
+      }
+
+      // Save changed grades
+      const promises = Object.keys(editValues).map(async (assessmentId) => {
+        const val = editValues[assessmentId];
+        if (val === undefined || val === '') return; // Skip empty?
+        await recordService.saveGrade(studentData.studentId, assessmentId, parseFloat(val));
+      });
+
+      await Promise.all(promises);
+
+      setIsEditing(false);
+      fetchData(); // Refresh
+    } catch (err) {
+      console.error(err);
+      alert("Failed to save changes");
+      setLoading(false);
+    }
+  };
+
+  // Group assessments
+  const assignments = assessments.filter(a => a.type === 'assignment');
+  const quizzes = assessments.filter(a => a.type === 'quiz');
+  const midterm = assessments.find(a => a.type === 'midterm');
+  const finalExam = assessments.find(a => a.type === 'final');
+
+  const getScore = (id) => {
+    if (isEditing && editValues[id] !== undefined) return editValues[id];
+    return grades[id]?.score ?? '';
+  };
+
+  const handleScoreChange = (id, val) => {
+    setEditValues(prev => ({ ...prev, [id]: val }));
+  };
+
+  const toggleWeek = (week) => {
+    if (!isEditing) return;
+    setEditAttendanceWeeks(prev => {
+      if (prev.includes(week)) {
+        return prev.filter(w => w !== week);
+      } else {
+        return [...prev, week].sort((a, b) => a - b);
+      }
+    });
+  };
+
+  const getAttendancePercentage = (weeks) => {
+    const totalWeeks = weekRange.end - weekRange.start + 1;
+    if (totalWeeks <= 0) return 0;
+    const count = weeks.filter(w => w >= weekRange.start && w <= weekRange.end).length;
+    return Math.round((count / totalWeeks) * 100);
+  };
+
+  const getCurrentPercentage = () => {
+    return isEditing ? getAttendancePercentage(editAttendanceWeeks) : getAttendancePercentage(attendanceWeeks);
+  }
 
   const getGradeColor = (score, maxScore) => {
-    if (score === null) return 'text-gray-500';
+    if (score == null || score === '') return 'text-gray-500';
     const percentage = (score / maxScore) * 100;
     if (percentage >= 90) return 'text-green-600';
     if (percentage >= 80) return 'text-blue-600';
@@ -277,44 +331,22 @@ const StudentRecordView = ({ studentData, courseTitle, isTutorView = false }) =>
     return 'text-red-600';
   };
 
-  const getGradeBadge = (score, maxScore) => {
-    if (score === null) return 'bg-gray-100 text-gray-600';
-    const percentage = (score / maxScore) * 100;
-    if (percentage >= 90) return 'bg-green-100 text-green-700';
-    if (percentage >= 80) return 'bg-blue-100 text-blue-700';
-    if (percentage >= 70) return 'bg-yellow-100 text-yellow-700';
-    return 'bg-red-100 text-red-700';
-  };
-
   const calculateProgress = () => {
-    const totalWeight = 100;
+    let totalWeight = 0;
     let completedWeight = 0;
-    let earnedScore = 0;
+    let weightedSum = 0;
 
-    // Assignments
-    recordData.assignments.forEach(assignment => {
-      if (assignment.score !== null) {
-        completedWeight += assignment.weight;
-        earnedScore += (assignment.score / assignment.maxScore) * 100 * (assignment.weight / 100);
+    assessments.forEach(a => {
+      totalWeight += a.weight;
+      const g = grades[a.id];
+      if (g && g.score != null) {
+        completedWeight += a.weight;
+        weightedSum += (g.score / a.max_score) * 100 * (a.weight / 100);
       }
     });
 
-    // Quizzes
-    recordData.quizzes.forEach(quiz => {
-      if (quiz.score !== null) {
-        completedWeight += quiz.weight;
-        earnedScore += (quiz.score / quiz.maxScore) * 100 * (quiz.weight / 100);
-      }
-    });
-
-    // Midterm
-    if (recordData.midterm.score !== null) {
-      completedWeight += recordData.midterm.weight;
-      earnedScore += (recordData.midterm.score / recordData.midterm.maxScore) * 100 * (recordData.midterm.weight / 100);
-    }
-
-    const progressPercentage = (completedWeight / totalWeight) * 100;
-    const currentGrade = completedWeight > 0 ? earnedScore / (completedWeight / 100) : 0;
+    const progressPercentage = totalWeight > 0 ? (completedWeight / totalWeight) * 100 : 0;
+    const currentGrade = completedWeight > 0 ? (weightedSum / (completedWeight / 100)) / 10 : 0;
 
     return {
       progressPercentage: Math.round(progressPercentage),
@@ -324,26 +356,53 @@ const StudentRecordView = ({ studentData, courseTitle, isTutorView = false }) =>
   };
 
   const progress = calculateProgress();
+  const currentAttendancePct = getCurrentPercentage();
+
+  // Generate weeks array
+  const weeks = [];
+  for (let i = weekRange.start; i <= weekRange.end; i++) {
+    weeks.push(i);
+  }
+
+  if (loading) return <div className="text-center py-8">Loading record...</div>;
+
+  if (assessments.length === 0) {
+    return (
+      <div className="text-center py-12 border border-dashed border-gray-300 rounded-xl">
+        <p className="text-gray-500 mb-4">No grading structure defined for this course.</p>
+        {isTutorView && (
+          <button
+            onClick={handleInitializeDefaults}
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+          >
+            Initialize Default Grading Structure
+          </button>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
       {/* Student Info Card */}
-      <div className="bg-gradient-to-r from-blue-600 to-indigo-600 rounded-xl p-6 text-white shadow-lg">
+      <div className="bg-gradient-to-r from-blue-600 to-indigo-600 rounded-xl p-6 text-white shadow-lg relative">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-2xl font-bold mb-1">{recordData.studentName}</h2>
-            <p className="text-blue-100 mb-3">Student Code: {recordData.studentCode}</p>
+            <h2 className="text-2xl font-bold mb-1">{studentData.fullName}</h2>
+            <p className="text-blue-100 mb-3">Student Code: {studentData.studentCode}</p>
             {isTutorView && studentData && (
               <p className="text-blue-100 text-sm">Email: {studentData.email}</p>
             )}
             <div className="flex items-center gap-6 mt-3">
               <div>
-                <div className="text-sm text-blue-100 mb-1">Overall Grade</div>
-                <div className="text-3xl font-bold">{recordData.overallGrade.toFixed(1)} / 10</div>
+                <div className="text-sm text-blue-100 mb-1">Current Grade</div>
+                <div className="text-3xl font-bold">{progress.currentGrade} / 10</div>
               </div>
               <div>
                 <div className="text-sm text-blue-100 mb-1">Attendance</div>
-                <div className="text-3xl font-bold">{recordData.attendance}%</div>
+                <div className="text-3xl font-bold">
+                  {currentAttendancePct}%
+                </div>
               </div>
               <div>
                 <div className="text-sm text-blue-100 mb-1">Course Progress</div>
@@ -351,258 +410,236 @@ const StudentRecordView = ({ studentData, courseTitle, isTutorView = false }) =>
               </div>
             </div>
           </div>
-          <div className="text-right">
-            <div className="text-sm text-blue-100 mb-1">Current Grade (Based on completed work)</div>
-            <div className="text-4xl font-bold">{progress.currentGrade} / 10</div>
-          </div>
+
+          {isTutorView && (
+            <div className="absolute top-6 right-6">
+              {!isEditing ? (
+                <button
+                  onClick={() => {
+                    setEditValues({}); // Clear edits
+                    setEditAttendanceWeeks(attendanceWeeks);
+                    setIsEditing(true);
+                  }}
+                  className="bg-white/20 hover:bg-white/30 text-white px-4 py-2 rounded-lg flex items-center gap-2 font-medium"
+                >
+                  <Edit className="w-4 h-4" /> Edit Record
+                </button>
+              ) : (
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setIsEditing(false)}
+                    className="bg-white/20 hover:bg-red-500/50 text-white px-3 py-2 rounded-lg"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={handleSave}
+                    className="bg-white text-blue-600 px-4 py-2 rounded-lg flex items-center gap-2 font-bold shadow-lg"
+                  >
+                    <Save className="w-4 h-4" /> Save
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Progress Overview */}
+      {/* Attendance Grid */}
       <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
-        <h3 className="text-xl font-bold text-gray-900 mb-4">Progress Overview</h3>
-        <div className="space-y-3">
-          <div>
-            <div className="flex justify-between text-sm text-gray-600 mb-2">
-              <span>Course Completion</span>
-              <span>{progress.completedWeight}% of total weight completed</span>
-            </div>
-            <div className="w-full bg-gray-200 rounded-full h-3">
+        <h3 className="text-xl font-bold text-gray-900 mb-4">Attendance ({weekRange.start} - {weekRange.end})</h3>
+        <div className="grid grid-cols-10 gap-2">
+          {weeks.map(week => {
+            const isAttended = isEditing ? editAttendanceWeeks.includes(week) : attendanceWeeks.includes(week);
+            return (
               <div
-                className="bg-gradient-to-r from-blue-600 to-indigo-600 h-3 rounded-full transition-all"
-                style={{ width: `${progress.progressPercentage}%` }}
-              />
-            </div>
-          </div>
-          <div>
-            <div className="flex justify-between text-sm text-gray-600 mb-2">
-              <span>Attendance</span>
-              <span>{recordData.attendance}%</span>
-            </div>
-            <div className="w-full bg-gray-200 rounded-full h-3">
-              <div
-                className={`h-3 rounded-full transition-all ${recordData.attendance >= 80 ? 'bg-green-500' : 'bg-yellow-500'
-                  }`}
-                style={{ width: `${recordData.attendance}%` }}
-              />
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Grade Breakdown */}
-      <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
-        <h3 className="text-xl font-bold text-gray-900 mb-4">Grade Breakdown</h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <div className="border border-gray-200 rounded-lg p-4">
-            <div className="text-sm text-gray-600 mb-1">Assignments</div>
-            <div className="text-2xl font-bold text-gray-900">
-              {recordData.assignments.filter(a => a.score !== null).length} / {recordData.assignments.length}
-            </div>
-            <div className="text-xs text-gray-500 mt-1">Weight: 50%</div>
-          </div>
-          <div className="border border-gray-200 rounded-lg p-4">
-            <div className="text-sm text-gray-600 mb-1">Quizzes</div>
-            <div className="text-2xl font-bold text-gray-900">
-              {recordData.quizzes.filter(q => q.score !== null).length} / {recordData.quizzes.length}
-            </div>
-            <div className="text-xs text-gray-500 mt-1">Weight: 30%</div>
-          </div>
-          <div className="border border-gray-200 rounded-lg p-4">
-            <div className="text-sm text-gray-600 mb-1">Midterm</div>
-            <div className="text-2xl font-bold text-gray-900">
-              {recordData.midterm.score !== null ? '✓' : '—'}
-            </div>
-            <div className="text-xs text-gray-500 mt-1">Weight: 20%</div>
-          </div>
-          <div className="border border-gray-200 rounded-lg p-4">
-            <div className="text-sm text-gray-600 mb-1">Final Exam</div>
-            <div className="text-2xl font-bold text-gray-900">
-              {recordData.finalExam.score !== null ? '✓' : '—'}
-            </div>
-            <div className="text-xs text-gray-500 mt-1">Weight: 30%</div>
-          </div>
+                key={week}
+                onClick={() => toggleWeek(week)}
+                className={`
+                     h-10 flex items-center justify-center rounded-lg font-medium text-sm border cursor-pointer transition-all
+                     ${isAttended
+                    ? 'bg-green-100 border-green-300 text-green-700 hover:bg-green-200'
+                    : 'bg-gray-50 border-gray-200 text-gray-500 hover:bg-gray-100'
+                  }
+                     ${isEditing ? 'ring-2 ring-transparent hover:ring-blue-300' : 'cursor-default'}
+                   `}
+                title={`Week ${week}`}
+              >
+                W{week}
+              </div>
+            );
+          })}
         </div>
       </div>
 
       {/* Assignments */}
-      <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-xl font-bold text-gray-900">Assignments</h3>
-          <span className="text-sm text-gray-600">Total Weight: 50%</span>
-        </div>
-        <div className="space-y-3">
-          {recordData.assignments.map((assignment) => (
-            <div
-              key={assignment.id}
-              className="border border-gray-200 rounded-lg p-4 hover:border-blue-300 hover:bg-blue-50 transition-all"
-            >
-              <div className="flex items-start justify-between">
-                <div className="flex-1">
-                  <div className="flex items-center gap-3 mb-2">
-                    <h4 className="text-base font-semibold text-gray-900">{assignment.title}</h4>
-                    <span className={`px-2 py-1 text-xs font-medium rounded ${getGradeBadge(assignment.score, assignment.maxScore)}`}>
-                      {assignment.status === 'graded' ? 'Graded' : assignment.status === 'pending' ? 'Pending' : 'Not Submitted'}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-4 text-sm text-gray-600">
-                    <span>Due: {new Date(assignment.dueDate).toLocaleDateString()}</span>
-                    {assignment.submittedDate && (
-                      <span>Submitted: {new Date(assignment.submittedDate).toLocaleDateString()}</span>
-                    )}
-                    <span>Weight: {assignment.weight}%</span>
+      {assignments.length > 0 && (
+        <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-xl font-bold text-gray-900">Assignments</h3>
+          </div>
+          <div className="space-y-3">
+            {assignments.map((assignment) => {
+              const score = grades[assignment.id]?.score;
+              return (
+                <div key={assignment.id} className="border border-gray-200 rounded-lg p-4">
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <h4 className="text-base font-semibold text-gray-900">{assignment.title}</h4>
+                      <div className="flex items-center gap-4 text-sm text-gray-600 mt-1">
+                        <span>Due: {assignment.due_date ? new Date(assignment.due_date).toLocaleDateString() : 'N/A'}</span>
+                        <span>Weight: {assignment.weight}%</span>
+                      </div>
+                    </div>
+                    <div className="text-right ml-4">
+                      {isEditing ? (
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="number"
+                            className="w-20 border rounded px-2 py-1 text-right"
+                            value={getScore(assignment.id)}
+                            placeholder={score ?? '-'}
+                            onChange={(e) => handleScoreChange(assignment.id, e.target.value)}
+                          />
+                          <span className="text-gray-500">/ {assignment.max_score}</span>
+                        </div>
+                      ) : (
+                        score !== undefined ? (
+                          <>
+                            <div className={`text-2xl font-bold ${getGradeColor(score, assignment.max_score)}`}>
+                              {score} / {assignment.max_score}
+                            </div>
+                          </>
+                        ) : (
+                          <div className="text-gray-400 text-base">Pending</div>
+                        )
+                      )}
+                    </div>
                   </div>
                 </div>
-                <div className="text-right ml-4">
-                  {assignment.score !== null ? (
-                    <>
-                      <div className={`text-2xl font-bold ${getGradeColor(assignment.score, assignment.maxScore)}`}>
-                        {assignment.score.toFixed(1)} / {assignment.maxScore}
-                      </div>
-                      <div className="text-sm text-gray-500 mt-1">
-                        {((assignment.score / assignment.maxScore) * 100).toFixed(1)}%
-                      </div>
-                    </>
-                  ) : (
-                    <div className="text-gray-400 text-base">Pending</div>
-                  )}
-                </div>
-              </div>
-            </div>
-          ))}
+              );
+            })}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Quizzes */}
-      <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-xl font-bold text-gray-900">Quizzes</h3>
-          <span className="text-sm text-gray-600">Total Weight: 30%</span>
-        </div>
-        <div className="space-y-3">
-          {recordData.quizzes.map((quiz) => (
-            <div
-              key={quiz.id}
-              className="border border-gray-200 rounded-lg p-4 hover:border-blue-300 hover:bg-blue-50 transition-all"
-            >
-              <div className="flex items-start justify-between">
-                <div className="flex-1">
-                  <div className="flex items-center gap-3 mb-2">
-                    <h4 className="text-base font-semibold text-gray-900">{quiz.title}</h4>
-                    <span className={`px-2 py-1 text-xs font-medium rounded ${quiz.status === 'completed' ? 'bg-green-100 text-green-700' :
-                      quiz.status === 'upcoming' ? 'bg-yellow-100 text-yellow-700' :
-                        'bg-gray-100 text-gray-700'
-                      }`}>
-                      {quiz.status === 'completed' ? 'Completed' : quiz.status === 'upcoming' ? 'Upcoming' : 'In Progress'}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-4 text-sm text-gray-600">
-                    <span>Date: {new Date(quiz.date).toLocaleDateString()}</span>
-                    <span>Weight: {quiz.weight}%</span>
-                  </div>
-                </div>
-                <div className="text-right ml-4">
-                  {quiz.score !== null ? (
-                    <>
-                      <div className={`text-2xl font-bold ${getGradeColor(quiz.score, quiz.maxScore)}`}>
-                        {quiz.score} / {quiz.maxScore}
+      {quizzes.length > 0 && (
+        <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
+          <h3 className="text-xl font-bold text-gray-900 mb-4">Quizzes</h3>
+          <div className="space-y-3">
+            {quizzes.map((quiz) => {
+              const score = grades[quiz.id]?.score;
+              return (
+                <div key={quiz.id} className="border border-gray-200 rounded-lg p-4">
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <h4 className="text-base font-semibold text-gray-900">{quiz.title}</h4>
+                      <div className="flex items-center gap-4 text-sm text-gray-600 mt-1">
+                        <span>Weight: {quiz.weight}%</span>
                       </div>
-                      <div className="text-sm text-gray-500 mt-1">
-                        {((quiz.score / quiz.maxScore) * 100).toFixed(1)}%
-                      </div>
-                    </>
-                  ) : (
-                    <div className="text-gray-400 text-base">
-                      {quiz.status === 'upcoming' ? 'Upcoming' : 'Pending'}
                     </div>
-                  )}
+                    <div className="text-right ml-4">
+                      {isEditing ? (
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="number"
+                            className="w-20 border rounded px-2 py-1 text-right"
+                            value={getScore(quiz.id)}
+                            placeholder={score ?? '-'}
+                            onChange={(e) => handleScoreChange(quiz.id, e.target.value)}
+                          />
+                          <span className="text-gray-500">/ {quiz.max_score}</span>
+                        </div>
+                      ) : (
+                        score !== undefined ? (
+                          <div className={`text-2xl font-bold ${getGradeColor(score, quiz.max_score)}`}>
+                            {score} / {quiz.max_score}
+                          </div>
+                        ) : (
+                          <div className="text-gray-400 text-base">Pending</div>
+                        )
+                      )}
+                    </div>
+                  </div>
                 </div>
-              </div>
-            </div>
-          ))}
+              );
+            })}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Exams */}
       <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
         <h3 className="text-xl font-bold text-gray-900 mb-4">Exams</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {/* Midterm */}
-          <div className="border border-gray-200 rounded-lg p-5">
-            <div className="flex items-center justify-between mb-3">
-              <h4 className="text-lg font-semibold text-gray-900">Midterm Exam</h4>
-              <span className={`px-2 py-1 text-xs font-medium rounded ${recordData.midterm.status === 'completed' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'
-                }`}>
-                {recordData.midterm.status === 'completed' ? 'Completed' : 'Upcoming'}
-              </span>
-            </div>
-            <div className="space-y-2 text-sm text-gray-600 mb-3">
-              <div>Date: {new Date(recordData.midterm.date).toLocaleDateString()}</div>
-              <div>Weight: {recordData.midterm.weight}%</div>
-            </div>
-            {recordData.midterm.score !== null ? (
-              <div className="mt-4">
-                <div className={`text-3xl font-bold ${getGradeColor(recordData.midterm.score, recordData.midterm.maxScore)}`}>
-                  {recordData.midterm.score} / {recordData.midterm.maxScore}
-                </div>
-                <div className="text-sm text-gray-500 mt-1">
-                  {((recordData.midterm.score / recordData.midterm.maxScore) * 100).toFixed(1)}%
-                </div>
+          {midterm && (
+            <div className="border border-gray-200 rounded-lg p-5">
+              <div className="flex items-center justify-between mb-3">
+                <h4 className="text-lg font-semibold text-gray-900">{midterm.title}</h4>
               </div>
-            ) : (
-              <div className="text-gray-400 text-base mt-4">Upcoming</div>
-            )}
-          </div>
+              <div className="space-y-2 text-sm text-gray-600 mb-3">
+                <div>Weight: {midterm.weight}%</div>
+              </div>
+              <div className="mt-4">
+                {isEditing ? (
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="number"
+                      className="w-full border rounded px-2 py-1 text-right"
+                      value={getScore(midterm.id)}
+                      placeholder={grades[midterm.id]?.score ?? '-'}
+                      onChange={(e) => handleScoreChange(midterm.id, e.target.value)}
+                    />
+                    <span className="text-gray-500">/ {midterm.max_score}</span>
+                  </div>
+                ) : (
+                  grades[midterm.id]?.score !== undefined ? (
+                    <div className={`text-3xl font-bold ${getGradeColor(grades[midterm.id].score, midterm.max_score)}`}>
+                      {grades[midterm.id].score} / {midterm.max_score}
+                    </div>
+                  ) : (
+                    <div className="text-gray-400 text-base">Upcoming</div>
+                  )
+                )}
+              </div>
+            </div>
+          )}
 
           {/* Final Exam */}
-          <div className="border border-gray-200 rounded-lg p-5">
-            <div className="flex items-center justify-between mb-3">
-              <h4 className="text-lg font-semibold text-gray-900">Final Exam</h4>
-              <span className={`px-2 py-1 text-xs font-medium rounded ${recordData.finalExam.status === 'completed' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'
-                }`}>
-                {recordData.finalExam.status === 'completed' ? 'Completed' : 'Upcoming'}
-              </span>
-            </div>
-            <div className="space-y-2 text-sm text-gray-600 mb-3">
-              <div>Date: {new Date(recordData.finalExam.date).toLocaleDateString()}</div>
-              <div>Weight: {recordData.finalExam.weight}%</div>
-            </div>
-            {recordData.finalExam.score !== null ? (
-              <div className="mt-4">
-                <div className={`text-3xl font-bold ${getGradeColor(recordData.finalExam.score, recordData.finalExam.maxScore)}`}>
-                  {recordData.finalExam.score} / {recordData.finalExam.maxScore}
-                </div>
-                <div className="text-sm text-gray-500 mt-1">
-                  {((recordData.finalExam.score / recordData.finalExam.maxScore) * 100).toFixed(1)}%
-                </div>
+          {finalExam && (
+            <div className="border border-gray-200 rounded-lg p-5">
+              <div className="flex items-center justify-between mb-3">
+                <h4 className="text-lg font-semibold text-gray-900">{finalExam.title}</h4>
               </div>
-            ) : (
-              <div className="text-gray-400 text-base mt-4">Upcoming</div>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* Legend */}
-      <div className="bg-gray-50 rounded-xl border border-gray-200 p-4">
-        <h4 className="text-sm font-semibold text-gray-700 mb-2">Grade Scale</h4>
-        <div className="flex flex-wrap gap-4 text-xs">
-          <div className="flex items-center gap-2">
-            <div className="w-4 h-4 bg-green-100 border border-green-300 rounded"></div>
-            <span className="text-gray-600">Excellent (90-100%)</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-4 h-4 bg-blue-100 border border-blue-300 rounded"></div>
-            <span className="text-gray-600">Good (80-89%)</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-4 h-4 bg-yellow-100 border border-yellow-300 rounded"></div>
-            <span className="text-gray-600">Average (70-79%)</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-4 h-4 bg-red-100 border border-red-300 rounded"></div>
-            <span className="text-gray-600">Needs Improvement (&lt;70%)</span>
-          </div>
+              <div className="space-y-2 text-sm text-gray-600 mb-3">
+                <div>Weight: {finalExam.weight}%</div>
+              </div>
+              <div className="mt-4">
+                {isEditing ? (
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="number"
+                      className="w-full border rounded px-2 py-1 text-right"
+                      value={getScore(finalExam.id)}
+                      placeholder={grades[finalExam.id]?.score ?? '-'}
+                      onChange={(e) => handleScoreChange(finalExam.id, e.target.value)}
+                    />
+                    <span className="text-gray-500">/ {finalExam.max_score}</span>
+                  </div>
+                ) : (
+                  grades[finalExam.id]?.score !== undefined ? (
+                    <div className={`text-3xl font-bold ${getGradeColor(grades[finalExam.id].score, finalExam.max_score)}`}>
+                      {grades[finalExam.id].score} / {finalExam.max_score}
+                    </div>
+                  ) : (
+                    <div className="text-gray-400 text-base">Upcoming</div>
+                  )
+                )}
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>
