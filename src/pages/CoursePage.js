@@ -14,7 +14,7 @@ export default function CoursePage() {
   const { id } = useParams();
   const location = useLocation();
   const [activeTab, setActiveTab] = useState('course');
-  
+
   // State for course data
   const [courseData, setCourseData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -30,9 +30,9 @@ export default function CoursePage() {
       if (classItem || program || routeCourse) {
         // Construct course object from state
         let course = {};
-        
+
         if (classItem) {
-           course = {
+          course = {
             id: classItem.id,
             title: `${classItem.programs?.program_code || ''} - ${classItem.programs?.name || ''} (${classItem.class_code || ''})`,
             tags: `[${classItem.class_code || ''}]`,
@@ -45,12 +45,12 @@ export default function CoursePage() {
           };
         } else if (routeCourse) {
           course = {
-             ...routeCourse,
-             title: routeCourse.title || routeCourse.name,
-             sections: routeCourse.sections || []
+            ...routeCourse,
+            title: routeCourse.title || routeCourse.name,
+            sections: routeCourse.sections || []
           };
         }
-        
+
         setCourseData(course);
         setLoading(false);
         return;
@@ -62,7 +62,7 @@ export default function CoursePage() {
         // We need to fetch class details. Assuming classService has a getById or similar.
         // If classService.getClassById returns everything we need:
         const data = await classService.getClassById(id);
-        
+
         if (data) {
           // Map DB response to UI format
           const mappedCourse = {
@@ -73,8 +73,8 @@ export default function CoursePage() {
           };
           setCourseData(mappedCourse);
         } else {
-             // Handle 404
-             setCourseData(null); 
+          // Handle 404
+          setCourseData(null);
         }
       } catch (err) {
         console.error("Failed to fetch course details:", err);
@@ -171,7 +171,7 @@ export default function CoursePage() {
         ) : activeTab === 'record' ? (
           <CourseRecord courseTitle={courseData.title} classId={courseData.id} />
         ) : activeTab === 'feedback' ? (
-          <CourseFeedback courseTitle={courseData.title} />
+          <CourseFeedback courseTitle={courseData.title} classId={courseData.id} />
         ) : activeTab === 'schedule' ? (
           <ScheduleEditor classId={courseData.id} tutorId={user?.details?.id} />
         ) : (

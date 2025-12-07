@@ -352,7 +352,7 @@ export default function StudentRegister() {
     const experience_score = Math.min(tutorTeachingYear, 20) / 20;
 
     // 3. rating_score
-    const rating_score = Math.min(tutorRating, 5) / 5;
+    const rating_score = Math.min(tutorRating, 1000) / 1000;
 
     // 4. gpa_difficulty
     const gpa_norm = studentGPA / 4;
@@ -563,6 +563,11 @@ export default function StudentRegister() {
     return classes.reduce((sum, cls) => sum + cls.max_students, 0);
   };
 
+  const formatRating = (totalStars, count) => {
+    if (!count || count === 0) return "New";
+    return (totalStars / count).toFixed(1);
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-7xl mx-auto px-4 py-8">
@@ -623,9 +628,20 @@ export default function StudentRegister() {
                   <div className="p-6">
                     <div className="flex items-start justify-between mb-3">
                       <div className="flex-1">
-                        <h3 className="text-xl font-semibold text-gray-900 mb-1">
-                          {program.program_code} - {program.name}
-                        </h3>
+                        <div className="flex items-center gap-2 mb-1">
+                          <h3 className="text-xl font-semibold text-gray-900">
+                            {program.program_code} - {program.name}
+                          </h3>
+                          <div className="flex items-center bg-yellow-50 px-2 py-0.5 rounded border border-yellow-200">
+                            <span className="text-yellow-500 mr-1">★</span>
+                            <span className="text-sm font-medium text-yellow-700">
+                              {formatRating(program.program_star, program.rating_count)}
+                            </span>
+                            {program.rating_count > 0 && (
+                              <span className="text-xs text-gray-500 ml-1">({program.rating_count})</span>
+                            )}
+                          </div>
+                        </div>
                         <p className="text-gray-600 text-sm">
                           {program.description}
                         </p>
@@ -718,7 +734,10 @@ export default function StudentRegister() {
                                     <div className="flex items-center gap-3 bg-gradient-to-r from-purple-50 to-pink-50 px-4 py-2 rounded-lg border border-purple-200">
                                       <span className="text-3xl">👨‍🏫</span>
                                       <div>
-                                        <span className="text-purple-600 text-xs font-medium uppercase tracking-wide">Instructor</span>
+                                        <div className="flex items-center gap-1">
+                                          <span className="text-purple-600 text-xs font-medium uppercase tracking-wide">Instructor</span>
+                                          <span className="text-yellow-500 text-xs">★ {formatRating(classData.tutor?.rating_star, classData.tutor?.rating_count)}</span>
+                                        </div>
                                         <p className="font-bold text-gray-900 text-base">{classData.tutor_name}</p>
                                       </div>
                                     </div>

@@ -90,6 +90,8 @@ class ProgramService {
         description,
         category,
         status,
+        program_star,
+        rating_count,
         classes (
           id,
           class_code,
@@ -107,7 +109,8 @@ class ProgramService {
           tutors:tutor_id (
             faculty,
             teaching_year,
-            rating_star
+            rating_star,
+            rating_count
           )
         )
       `)
