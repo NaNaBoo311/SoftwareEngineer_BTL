@@ -181,7 +181,7 @@ class ProgramService {
     // 1️ Fetch classes
     const { data: classes, error: classError } = await supabase
       .from('classes')
-      .select('id, class_code, tutor_name, tutor_id');
+      .select('id, class_code, tutor_name, tutor_id, programs(name)');
 
     if (classError) throw classError;
 
@@ -206,6 +206,7 @@ class ProgramService {
         grouped[cls.id] = {
           id: cls.id,
           class_code: cls.class_code,
+          program_name: cls.programs?.name || "Unknown Program",
           tutor_name: cls.tutor_name,
           tutor_id: cls.tutor_id,
           schedules: [],

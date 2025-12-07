@@ -80,7 +80,7 @@ class TutorService {
         weeks,
         room,
         created_at,
-        class:class_id (
+        class:class_id!inner (
           id,
           class_code,
           tutor_name,

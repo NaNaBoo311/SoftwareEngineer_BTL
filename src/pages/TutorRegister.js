@@ -357,6 +357,25 @@ const TutorRegister = () => {
       return;
     }
 
+    // Validate for Overlaps (Redundant check for safety)
+    for (const config of sharedConfiguration.periods) {
+      // Check against all taken schedules
+      for (const classSched of takenSchedules) {
+        if (String(classSched.id) === String(selectedClass?.id)) continue;
+        if (String(classSched.tutor_id) === String(user.details.id)) {
+          const hasConflict = classSched.schedules.some(s =>
+            parseInt(s.day) === parseInt(config.day) &&
+            parseInt(s.period) === parseInt(config.period) &&
+            selectedWeeks.some(week => parseInt(week) === parseInt(s.week))
+          );
+          if (hasConflict) {
+            showNotification('Schedule Conflict', `You already have ${classSched.class_code} scheduled at Period ${config.period} on Day ${config.day} during selected weeks.`, 'error');
+            return;
+          }
+        }
+      }
+    }
+
     // Convert shared configuration to per-week configurations
     const weekConfigurations = {};
     selectedWeeks.forEach(week => {
@@ -584,16 +603,16 @@ const TutorRegister = () => {
 
       // Iterate through all taken schedules
       for (const classSched of takenSchedules) {
-        // Skip the current class we are editing
-        if (classSched.class_code === selectedClass?.class_code) continue;
+        // Skip the current class we are editing (using unique ID)
+        if (String(classSched.id) === String(selectedClass?.id)) continue;
 
-        // Check if this class is taught by ME
-        if (classSched.tutor_id === user.details.id) {
+        // Check if this class is taught by ME (normalize IDs to strings for safety)
+        if (String(classSched.tutor_id) === String(user.details.id)) {
           // Check if there is a schedule conflict
           const hasConflict = classSched.schedules.some(s =>
-            s.day === dayId &&
-            s.period === periodId &&
-            selectedWeeks.includes(s.week)
+            parseInt(s.day) === parseInt(dayId) &&
+            parseInt(s.period) === parseInt(periodId) &&
+            selectedWeeks.some(week => parseInt(week) === parseInt(s.week))
           );
 
           if (hasConflict) return classSched;
@@ -694,6 +713,9 @@ const TutorRegister = () => {
                                 <span className="text-[10px] font-bold text-red-400">Busy</span>
                                 <span className="text-[10px] text-red-300 truncate w-full text-center">
                                   {occupiedByMeClass.class_code}
+                                </span>
+                                <span className="text-[9px] text-red-300 truncate w-full text-center opacity-75">
+                                  {occupiedByMeClass.program_name}
                                 </span>
                               </div>
                             )}

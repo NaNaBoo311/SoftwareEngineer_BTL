@@ -10,31 +10,21 @@ export default function StudentSchedule() {
     const navigate = useNavigate();
     const [scheduleItems, setScheduleItems] = useState([]);
     const [loading, setLoading] = useState(true);
-    const [currentDate, setCurrentDate] = useState(new Date());
+    const [currentWeek, setCurrentWeek] = useState(35); // Default to week 35
 
     // Constants
     const periods = Array.from({ length: 12 }, (_, i) => i + 1); // 1 to 12
-    const daysOfWeek = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+    const daysOfWeek = [
+        { id: 1, name: "Monday" },
+        { id: 2, name: "Tuesday" },
+        { id: 3, name: "Wednesday" },
+        { id: 4, name: "Thursday" },
+        { id: 5, name: "Friday" },
+        { id: 6, name: "Saturday" },
+        { id: 7, name: "Sunday" }
+    ];
 
-    // Helper to get dates for the current week (starting Monday)
-    const getWeekDates = (baseDate) => {
-        const dates = [];
-        const currentDay = baseDate.getDay(); // 0 is Sunday, 1 is Monday
-        const diffToMonday = currentDay === 0 ? -6 : 1 - currentDay; // Calculate overlap to Monday
 
-        // Start from Monday of the current week
-        const monday = new Date(baseDate);
-        monday.setDate(baseDate.getDate() + diffToMonday);
-
-        for (let i = 0; i < 7; i++) {
-            const day = new Date(monday);
-            day.setDate(monday.getDate() + i);
-            dates.push(day);
-        }
-        return dates;
-    };
-
-    const weekDates = getWeekDates(currentDate);
 
     useEffect(() => {
         if (user?.role === "student" && user.details?.id) {
@@ -48,7 +38,15 @@ export default function StudentSchedule() {
         try {
             setLoading(true);
             const data = await studentService.getStudentWeeklySchedule(user.details.id);
-            setScheduleItems(data);
+
+            // Format data to ensure consistent structure (especially for weeks)
+            const formattedItems = data.map(item => ({
+                ...item,
+                // Ensure weeks is always an array of numbers or strings we can compare
+                weeks: Array.isArray(item.weeks) ? item.weeks : (typeof item.weeks === 'string' ? [item.weeks] : [])
+            }));
+
+            setScheduleItems(formattedItems);
         } catch (error) {
             console.error("Error fetching schedule:", error);
         } finally {
@@ -56,36 +54,29 @@ export default function StudentSchedule() {
         }
     };
 
-    // Helper to format date header
-    const formatDateHeader = (date) => {
-        const dayName = date.toLocaleDateString("en-US", { weekday: "long" });
-        const dayDate = date.toLocaleDateString("en-GB", { day: "2-digit", month: "2-digit" });
-        return { dayName, dayDate };
-    };
+
 
     // Helper to find class for a specific day and period
-    const getClassForSlot = (dayName, period) => {
-        const dayMap = {
-            "1": "Monday", "2": "Tuesday", "3": "Wednesday",
-            "4": "Thursday", "5": "Friday", "6": "Saturday", "7": "Sunday"
-        };
-
+    const getClassForSlot = (dayId, period) => {
         return scheduleItems.find(item => {
             // Handle day matching
-            const itemDayName = dayMap[String(item.day)] || item.day;
-            const isDayMatch = itemDayName === dayName;
+            const isDayMatch = item.day == dayId;
 
-            // Handle period matching (loose equality for string/number match)
+            // Handle period matching
             const isPeriodMatch = item.period == period;
 
-            return isDayMatch && isPeriodMatch;
+            // Handle Week matching
+            const isWeekMatch = item?.weeks?.some(w => parseInt(w) === currentWeek);
+
+            return isDayMatch && isPeriodMatch && isWeekMatch;
         });
     };
 
     const navigateWeek = (direction) => {
-        const newDate = new Date(currentDate);
-        newDate.setDate(currentDate.getDate() + (direction * 7));
-        setCurrentDate(newDate);
+        setCurrentWeek(prev => {
+            const next = prev + direction;
+            return next > 0 ? next : 1;
+        });
     };
 
     // Helper to generate a consistent color for a program name
@@ -141,7 +132,7 @@ export default function StudentSchedule() {
                         <ChevronLeft size={20} />
                     </button>
                     <span className="px-4 font-semibold text-gray-700 min-w-[200px] text-center">
-                        {weekDates[0].toLocaleDateString("en-US", { month: "short", day: "numeric" })} - {weekDates[6].toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                        Week {currentWeek}
                     </span>
                     <button onClick={() => navigateWeek(1)} className="p-2 hover:bg-gray-100 rounded-md">
                         <ChevronRight size={20} />
@@ -160,22 +151,15 @@ export default function StudentSchedule() {
                                     <th className="p-4 border-b border-r border-gray-100 bg-gray-50 w-24 sticky left-0 z-10 text-gray-400 font-medium">
                                         Period
                                     </th>
-                                    {weekDates.map((date, index) => {
-                                        const { dayName, dayDate } = formatDateHeader(date);
-                                        const isToday = new Date().toDateString() === date.toDateString();
-                                        return (
-                                            <th key={index} className={`p-4 border-b border-gray-100 min-w-[140px] ${isToday ? 'bg-blue-50' : 'bg-white'}`}>
-                                                <div className="flex flex-col items-center">
-                                                    <span className={`text-sm font-bold ${isToday ? 'text-blue-600' : 'text-gray-800'}`}>
-                                                        {dayName}
-                                                    </span>
-                                                    <span className={`text-xs mt-1 px-2 py-0.5 rounded-full ${isToday ? 'bg-blue-600 text-white' : 'text-gray-500 bg-gray-100'}`}>
-                                                        {dayDate}
-                                                    </span>
-                                                </div>
-                                            </th>
-                                        );
-                                    })}
+                                    {daysOfWeek.map((day) => (
+                                        <th key={day.id} className="p-4 border-b border-gray-100 min-w-[140px] bg-white">
+                                            <div className="flex flex-col items-center">
+                                                <span className="text-gray-800 font-bold text-sm">
+                                                    {day.name}
+                                                </span>
+                                            </div>
+                                        </th>
+                                    ))}
                                 </tr>
                             </thead>
                             <tbody>
@@ -187,8 +171,8 @@ export default function StudentSchedule() {
                                         </td>
 
                                         {/* Day Columns */}
-                                        {daysOfWeek.map((dayName) => {
-                                            const classItem = getClassForSlot(dayName, period);
+                                        {daysOfWeek.map((day) => {
+                                            const classItem = getClassForSlot(day.id, period);
                                             // Get color if class exists
                                             const colorClass = classItem ? getColorForProgram(classItem.program_name) : "";
 
@@ -196,7 +180,7 @@ export default function StudentSchedule() {
                                             // colorClass looks like "bg-blue-100 border-blue-500 text-blue-800"
 
                                             return (
-                                                <td key={dayName} className="border-b border-r border-gray-100 p-1 h-24 align-top relative">
+                                                <td key={day.id} className="border-b border-r border-gray-100 p-1 h-24 align-top relative">
                                                     {classItem && (
                                                         <div className={`absolute inset-1 border-l-4 rounded p-2 text-xs flex flex-col justify-between overflow-hidden hover:scale-[1.02] transition-transform shadow-sm cursor-pointer z-0 ${colorClass}`}>
                                                             <div>
