@@ -201,6 +201,7 @@ class ProgramService {
 
       if (!grouped[cls.id]) {
         grouped[cls.id] = {
+          id: cls.id,
           class_code: cls.class_code,
           tutor_name: cls.tutor_name,
           tutor_id: cls.tutor_id,

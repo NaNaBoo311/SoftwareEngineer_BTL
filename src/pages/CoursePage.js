@@ -150,7 +150,7 @@ export default function CoursePage() {
                 : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-200'
                 }`}
             >
-              Schedule
+              Manage Session
             </button>
           )}
         </div>

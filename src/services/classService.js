@@ -38,6 +38,7 @@ class ClassService {
         enrollmentId: enrollment.id,
         enrolledAt: enrollment.enrolled_at,
         studentId: student?.id,
+        userId: user?.id, // Added userId for notifications
         studentCode: student?.student_code,
         major: student?.major,
         faculty: student?.faculty,
