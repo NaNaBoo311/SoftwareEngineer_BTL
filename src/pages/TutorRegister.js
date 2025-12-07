@@ -897,7 +897,17 @@ const TutorRegister = () => {
       </div>
 
       {/* Room Selection Modal */}
-      {/* Room Selection Modal */}
+    </div>
+  );
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      {currentStep === 1 && renderStep1()}
+      {currentStep === 2 && renderStep2()}
+      {currentStep === 3 && renderStep3()}
+
+      {/* Modals placed here to be available across all steps if needed, 
+          though Room/Mode are mostly for Step 3, Notification is for all */}
       <RoomSelectionModal
         isOpen={showRoomModal}
         onClose={() => {
@@ -939,14 +949,6 @@ const TutorRegister = () => {
         message={notification.message}
         type={notification.type}
       />
-    </div>
-  );
-
-  return (
-    <div className="min-h-screen bg-gray-50">
-      {currentStep === 1 && renderStep1()}
-      {currentStep === 2 && renderStep2()}
-      {currentStep === 3 && renderStep3()}
     </div>
   );
 };
